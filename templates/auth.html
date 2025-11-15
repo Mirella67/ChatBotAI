@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="panel" style="max-width:520px;margin:0 auto">
+  <h2>{{ title }}</h2>
+  <form method="post">
+    <div style="margin-bottom:8px"><label>Username<br><input name="username" required style="width:100%;padding:8px;border-radius:6px"></label></div>
+    <div style="margin-bottom:8px"><label>Password<br><input name="password" type="password" required style="width:100%;padding:8px;border-radius:6px"></label></div>
+    {% if extra %}<div style="margin-bottom:8px">{{ extra }}</div>{% endif %}
+    <div><button type="submit">{{ button }}</button></div>
+  </form>
+  <div class="small" style="margin-top:8px">Nota: demo in-memory. Cambia password e usa DB per produzione.</div>
+</div>
+
+{% endblock %}
