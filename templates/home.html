@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row">
+  <div class="col-flex panel">
+    <div class="chat-window">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px">
+        <div><strong>EMI SUPER BOT</strong><div class="small">Assistente intelligente</div></div>
+        <div><span class="small">Plan: <strong>{{ plan|upper }}</strong></span></div>
+      </div>
+
+      <div class="messages" id="messages">
+        {% for m in history %}
+          <div class="bubble {{ 'user' if m.role=='user' else 'bot' }}">{{ m.content }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="controls">
+        <textarea id="prompt" placeholder="Scrivi qualcosa..."></textarea>
+        <button id="sendBtn">Invia</button>
+      </div>
+      <div class="small" style="padding:8px 12px">
+        Limite giornaliero free: {{ free_limit }} — Usati oggi: {{ used_today }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-3 panel">
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>{{ username or 'Ospite' }}</strong><div class="small">Account</div></div>
+        <div class="app-icon">U</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px"><strong>Account</strong>
+      <div class="small">Tipo: <strong>{{ plan }}</strong></div>
+      <div class="small">Creato: {{ created_at }}</div>
+      <div style="margin-top:8px">
+        {% if not premium %}
+        <form action="{{ url_for('upgrade') }}" method="post" class="inline">
+          <input name="code" placeholder="Codice premium">
+          <button type="submit">Usa codice</button>
+        </form>
+        <div style="margin-top:8px">
+          <button onclick="window.open('{{ buy_link }}','_blank')">Compra Premium</button>
+        </div>
+        {% else %}
+        <div class="small">Sei Premium — grazie! 💎</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div><strong>Azioni</strong>
+      <div style="margin-top:8px">
+        <form action="{{ url_for('clear_history') }}" method="post"><button type="submit">Pulisci cronologia</button></form>
+      </div>
+    </div>
+
+    <div style="margin-top:12px"><strong>Admin</strong>
+      <div class="small">Vai a <a href="{{ url_for('admin') }}">Admin Panel</a></div>
+    </div>
+
+    <!-- Install PWA -->
+    <button id="installBtn" onclick="installPWA()" style="display:none;margin-top:20px;">📲 Installa App</button>
+
+  </div>
+</div>
+
+
+<script>
+const sendBtn = document.getElementById('sendBtn');
+const prompt = document.getElementById('prompt');
+const messagesEl = document.getElementById('messages');
+
+function appendMessage(text, who){
+  const d = document.createElement('div');
+  d.className = 'bubble ' + (who==='user'?'user':'bot');
+  d.textContent = text;
+  messagesEl.appendChild(d);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+sendBtn.addEventListener('click', async ()=>{
+  const txt = prompt.value.trim();
+  if(!txt) return;
+  appendMessage(txt,'user');
+  prompt.value = '';
+  const typing = document.createElement('div');
+  typing.className = 'bubble bot';
+  typing.textContent = 'EMI sta scrivendo…';
+  messagesEl.appendChild(typing);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  const res = await fetch('/chat', {
+    method:'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({message: txt})
+  });
+  const data = await res.json();
+  messagesEl.removeChild(typing);
+  if(data.error){
+    appendMessage("Errore: "+data.error,'bot');
+  } else {
+    appendMessage(data.reply,'bot');
+  }
+});
+</script>
+
+{% endblock %}
