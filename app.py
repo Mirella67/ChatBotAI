@@ -518,7 +518,7 @@ def welcome():
     # Set guessed language
     lang = guess_language_from_request()
     country = request.accept_languages.best or ""
-    return render_template_string(WELCOME_HTML, base=BASE_HTML, lang=lang, country=country, username=session.get("username"))
+    return render_template(WELCOME_HTML, base=BASE_HTML, lang=lang, country=country, username=session.get("username"))
 
 @app.route("/guest", methods=["POST"])
 def guest():
@@ -552,7 +552,10 @@ def register():
         return redirect(url_for("home"))
     # GET
     lang = guess_language_from_request()
-    return render_template_string(AUTH_HTML, base=BASE_HTML, title="Register", button="Create account", extra=None, lang=lang, username=None)
+    return render_template(AUTH_HTML, base=BASE_HTML, title="Register", button="Create account", extra=None, lang=lang, username=None)
+
+app = Flask(__name__)
+app.secret_key = FLASK_SECRET
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -574,7 +577,7 @@ def login():
         return "Invalid credentials", 400
     # GET
     lang = guess_language_from_request()
-    return render_template_string(AUTH_HTML, base=BASE_HTML, title="Login", button="Login", extra=None, lang=lang, username=None)
+    return render_template(AUTH_HTML, base=BASE_HTML, title="Login", button="Login", extra=None, lang=lang, username=None)
 
 @app.route("/logout")
 def logout():
@@ -599,9 +602,13 @@ def home():
     history = []
     if u:
         history = [{"role": m["role"], "content": m["content"]} for m in u.get("history", [])[-(HISTORY_PREMIUM*2):]]
-    return render_template_string(HOME_HTML, base=BASE_HTML, username=uname, plan=plan, premium=(u.get("premium") if u else False),
+    return render_template(HOME_HTML, base=BASE_HTML, username=uname, plan=plan, premium=(u.get("premium") if u else False),
                                   created_at=(u.get("created_at") if u else ""), history=history,
                                   free_limit=FREE_DAILY_LIMIT, used_today=used, buy_link=BUY_LINK)
+
+    if u.get("is_guest"):
+    u["history"] = []  # ospiti non salvano chat
+
 
 @app.route("/chat", methods=["POST"])
 @login_required
@@ -750,7 +757,7 @@ def admin():
             "is_admin": data.get("is_admin"),
             "created_at": data.get("created_at")
         }))
-    return render_template_string(ADMIN_HTML, base=BASE_HTML, users=uv, codes=sorted(list(VALID_PREMIUM_CODES)), used=USED_PREMIUM_CODES, username=session.get("username"))
+    return render_template(ADMIN_HTML, base=BASE_HTML, users=uv, codes=sorted(list(VALID_PREMIUM_CODES)), used=USED_PREMIUM_CODES, username=session.get("username"))
 
 @app.route("/admin/generate_codes", methods=["POST"])
 @admin_required
@@ -858,3 +865,4 @@ def generated_file(filename):
 if __name__ == "__main__":
     print("EMI SUPER BOT starting. Set GROQ_API_KEY in env before production.")
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
+
