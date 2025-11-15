@@ -400,17 +400,18 @@ CHAT_HTML = """
             z-index: 100;
         }
         .sidebar-top {
-            padding: 12px;
+            padding: 8px;
         }
         .new-chat-btn {
             background: transparent;
             border: 1px solid rgba(255,255,255,0.2);
             color: #ececf1;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 10px;
             cursor: pointer;
             display: flex;
             align-items: center;
+            justify-content: flex-start;
             gap: 12px;
             font-size: 14px;
             transition: background 0.2s;
@@ -419,67 +420,61 @@ CHAT_HTML = """
         .new-chat-btn:hover {
             background: rgba(255,255,255,0.1);
         }
-        .sidebar-divider {
-            height: 1px;
-            background: rgba(255,255,255,0.1);
-            margin: 8px 12px;
+        .new-chat-icon {
+            width: 18px;
+            height: 18px;
         }
         .sidebar-content {
             flex: 1;
             overflow-y: auto;
-            padding: 0 12px;
+            padding: 8px;
         }
-        .sidebar-section-title {
-            font-size: 12px;
-            color: #8e8ea0;
-            padding: 12px 8px 8px 8px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        .user-section {
+            border-top: 1px solid rgba(255,255,255,0.1);
         }
-        .chat-history-item {
-            padding: 10px 12px;
-            margin: 2px 0;
-            border-radius: 8px;
+        .user-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
             color: #ececf1;
             font-size: 14px;
             cursor: pointer;
             transition: background 0.2s;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
         }
-        .chat-history-item:hover {
+        .user-menu-item:hover {
             background: rgba(255,255,255,0.1);
         }
-        .chat-icon {
-            font-size: 16px;
+        .user-menu-icon {
+            width: 18px;
+            height: 18px;
             opacity: 0.8;
         }
-        .user-section {
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding: 12px;
-        }
-        .user-profile {
+        .user-profile-btn {
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 10px 12px;
-            border-radius: 8px;
+            border-radius: 10px;
             transition: background 0.2s;
             cursor: pointer;
+            background: transparent;
+            border: none;
+            width: 100%;
+            color: #ececf1;
         }
-        .user-profile:hover {
+        .user-profile-btn:hover {
             background: rgba(255,255,255,0.1);
         }
         .user-avatar {
             width: 32px;
             height: 32px;
-            border-radius: 6px;
-            background: linear-gradient(135deg, #10a37f, #1a7f64);
+            border-radius: 50%;
+            background: #19c37d;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -500,91 +495,25 @@ CHAT_HTML = """
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .user-plan {
+        .user-email {
             font-size: 12px;
             color: #8e8ea0;
-            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .plan-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 600;
+        .menu-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 4px 0;
         }
-        .plan-free {
-            background: rgba(142, 142, 160, 0.2);
-            color: #8e8ea0;
-        }
-        .plan-premium {
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 237, 78, 0.2));
-            color: #ffd700;
-        }
-        .plan-guest {
-            background: rgba(142, 142, 160, 0.15);
-            color: #8e8ea0;
-        }
-        .usage-info {
-            font-size: 12px;
-            color: #8e8ea0;
-            padding: 8px 12px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            margin: 8px 0;
-        }
-        .sidebar-btn {
-            width: 100%;
-            padding: 10px 12px;
-            margin-top: 6px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
+        .upgrade-menu-item {
+            background: rgba(25, 195, 125, 0.1);
+            color: #19c37d;
             font-weight: 500;
-            font-size: 14px;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
-        .upgrade-btn {
-            background: linear-gradient(135deg, #ffd700, #ffed4e);
-            color: #000;
-        }
-        .upgrade-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
-        }
-        .register-btn {
-            background: #10a37f;
-            color: white;
-        }
-        .register-btn:hover {
-            background: #0d8c6d;
-        }
-        .login-btn {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #ececf1;
-        }
-        .login-btn:hover {
-            background: rgba(255,255,255,0.15);
-        }
-        .logout-btn {
-            background: rgba(255,255,255,0.05);
-            color: #ececf1;
-        }
-        .logout-btn:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .guest-message {
-            font-size: 12px;
-            color: #8e8ea0;
-            padding: 12px;
-            line-height: 1.5;
-            text-align: center;
+        .upgrade-menu-item:hover {
+            background: rgba(25, 195, 125, 0.15);
         }
         
         /* MAIN CHAT */
@@ -725,17 +654,62 @@ CHAT_HTML = """
             width: 90%;
         }
         .modal h2 {
-            color: #ffd700;
+            color: #ececf1;
             margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        .modal p {
+            color: #8e8ea0;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        .pricing-card {
+            background: #2a2b32;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        .pricing-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .pricing-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ececf1;
+        }
+        .pricing-badge {
+            background: #19c37d;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .pricing-price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ececf1;
+            margin-bottom: 0.5rem;
+        }
+        .pricing-period {
+            color: #8e8ea0;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
         }
         .modal ul {
             list-style: none;
-            margin: 1rem 0;
+            margin: 1rem 0 1.5rem 0;
         }
         .modal li {
-            padding: 0.5rem 0;
-            padding-left: 1.5rem;
+            padding: 0.75rem 0;
+            padding-left: 2rem;
             position: relative;
+            color: #ececf1;
+            line-height: 1.5;
         }
         .modal li:before {
             content: "✓";
@@ -743,40 +717,59 @@ CHAT_HTML = """
             left: 0;
             color: #19c37d;
             font-weight: bold;
+            font-size: 1.2rem;
         }
         .modal input {
             width: 100%;
             padding: 0.75rem;
             margin: 1rem 0;
-            border: 1px solid #565869;
+            border: 1px solid rgba(255,255,255,0.2);
             border-radius: 8px;
-            background: #40414f;
+            background: #2a2b32;
             color: #ececf1;
+            font-size: 14px;
+        }
+        .modal input:focus {
+            outline: none;
+            border-color: #19c37d;
         }
         .modal-buttons {
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
         }
         .modal button {
             flex: 1;
-            padding: 0.75rem;
+            padding: 0.875rem;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
         }
         .modal .btn-buy {
-            background: linear-gradient(135deg, #ffd700, #ffed4e);
-            color: #000;
+            background: #19c37d;
+            color: white;
+        }
+        .modal .btn-buy:hover {
+            background: #17a86f;
         }
         .modal .btn-code {
-            background: #565869;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
             color: #ececf1;
+        }
+        .modal .btn-code:hover {
+            background: rgba(255,255,255,0.1);
         }
         .modal .btn-close {
             background: transparent;
-            border: 1px solid #565869;
+            border: 1px solid rgba(255,255,255,0.2);
             color: #ececf1;
+        }
+        .modal .btn-close:hover {
+            background: rgba(255,255,255,0.1);
         }
     </style>
 </head>
@@ -785,60 +778,54 @@ CHAT_HTML = """
     <div class="sidebar">
         <div class="sidebar-top">
             <button class="new-chat-btn" onclick="location.reload()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="new-chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 5v14M5 12h14"/>
                 </svg>
                 <span>New chat</span>
             </button>
         </div>
         
-        <div class="sidebar-divider"></div>
-        
         <div class="sidebar-content">
-            <!-- Area per cronologia chat - vuota per ora -->
+            <!-- Chat history area -->
         </div>
         
         <div class="user-section">
             {% if is_guest %}
-                <div class="user-profile">
+                <button class="user-profile-btn" onclick="location.href='/register'">
                     <div class="user-avatar">?</div>
                     <div class="user-details">
-                        <div class="user-name">Guest</div>
-                        <div class="user-plan">
-                            <span class="plan-badge plan-guest">TEMPORARY</span>
-                        </div>
+                        <div class="user-name">Sign up</div>
                     </div>
-                </div>
-                <p class="guest-message">Sign up to save your conversations</p>
-                <button class="sidebar-btn register-btn" onclick="location.href='/register'">
-                    <span>✨</span>
-                    <span>Sign up</span>
                 </button>
-                <button class="sidebar-btn login-btn" onclick="location.href='/login'">
+                <div class="menu-divider"></div>
+                <button class="user-menu-item" onclick="location.href='/login'">
                     <span>Log in</span>
                 </button>
             {% else %}
-                <div class="user-profile">
+                <button class="user-profile-btn">
                     <div class="user-avatar">{{ username[0].upper() }}</div>
                     <div class="user-details">
                         <div class="user-name">{{ username }}</div>
-                        <div class="user-plan">
-                            <span class="plan-badge {{ 'plan-premium' if premium else 'plan-free' }}">
-                                {% if premium %}⭐ Premium{% else %}Free plan{% endif %}
-                            </span>
-                        </div>
+                        <div class="user-email">{% if premium %}ChatGPT Plus{% else %}Free plan{% endif %}</div>
                     </div>
-                </div>
-                {% if not premium %}
-                <div class="usage-info">
-                    📊 {{ used_today }}/{{ free_limit }} messages today
-                </div>
-                <button class="sidebar-btn upgrade-btn" onclick="showPremium()">
-                    <span>⭐</span>
-                    <span>Upgrade to Plus</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
                 </button>
+                <div class="menu-divider"></div>
+                {% if not premium %}
+                <button class="user-menu-item upgrade-menu-item" onclick="showPremium()">
+                    <svg class="user-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                    <span>Upgrade plan</span>
+                </button>
+                <div class="menu-divider"></div>
                 {% endif %}
-                <button class="sidebar-btn logout-btn" onclick="location.href='/logout'">
+                <button class="user-menu-item" onclick="location.href='/logout'">
+                    <svg class="user-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                    </svg>
                     <span>Log out</span>
                 </button>
             {% endif %}
@@ -867,28 +854,39 @@ CHAT_HTML = """
     <!-- MODAL PREMIUM -->
     <div class="modal" id="premiumModal">
         <div class="modal-content">
-            <h2>⭐ EMI SUPER BOT Premium</h2>
-            <p>Sblocca tutto il potenziale dell'AI:</p>
-            <ul>
-                <li>Messaggi illimitati</li>
-                <li>Modello AI più potente (70B)</li>
-                <li>Cronologia estesa (40 coppie)</li>
-                <li>Supporto prioritario</li>
-            </ul>
-            <div class="modal-buttons">
-                <button class="btn-buy" onclick="window.open('{{ buy_link }}', '_blank')">
-                    💳 Acquista Premium
-                </button>
-                <button class="btn-code" onclick="showCodeInput()">
-                    🎟️ Ho un Codice
-                </button>
+            <h2>Upgrade your plan</h2>
+            <p>Get ChatGPT Plus for unlimited access and priority responses</p>
+            
+            <div class="pricing-card">
+                <div class="pricing-header">
+                    <div class="pricing-title">ChatGPT Plus</div>
+                    <div class="pricing-badge">MOST POPULAR</div>
+                </div>
+                <div class="pricing-price">$20<span style="font-size:1rem;font-weight:400;color:#8e8ea0;">/mo</span></div>
+                <div class="pricing-period">Billed monthly</div>
+                <ul>
+                    <li>Unlimited messages with our smartest model</li>
+                    <li>Access to advanced data analysis</li>
+                    <li>Browse, create, and use custom GPTs</li>
+                    <li>Early access to new features</li>
+                </ul>
+                <div class="modal-buttons">
+                    <button class="btn-buy" onclick="window.open('{{ buy_link }}', '_blank')">
+                        Subscribe to Plus
+                    </button>
+                    <button class="btn-code" onclick="showCodeInput()">
+                        Have a code?
+                    </button>
+                </div>
             </div>
+            
             <div id="codeInput" style="display:none;">
-                <input type="text" id="premiumCode" placeholder="Inserisci codice premium">
-                <button class="btn-buy" onclick="redeemCode()" style="width:100%">Attiva</button>
+                <input type="text" id="premiumCode" placeholder="Enter your activation code">
+                <button class="btn-buy" onclick="redeemCode()" style="width:100%">Activate</button>
             </div>
+            
             <button class="btn-close" onclick="hidePremium()" style="margin-top:1rem;width:100%">
-                Chiudi
+                Cancel
             </button>
         </div>
     </div>
