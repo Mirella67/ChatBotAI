@@ -1,7 +1,4 @@
-# app.py - EMI SUPER BOT (complete single-file)
-# Save as app.py in project root. Requires: Flask, bcrypt, groq (optional)
-# Comments in Italian.
-
+# app.py - EMI SUPER BOT (VERSIONE CORRETTA)
 import os
 import time
 import secrets
@@ -13,25 +10,11 @@ from hmac import new as hmac_new
 
 from flask import (
     Flask, request, jsonify, session, render_template,
-    redirect, url_for, send_from_directory, flash
+    redirect, url_for, flash
 )
 import bcrypt
 
-# --- Auto lingua ---
-from flask import request
-import locale
-
-def detect_language():
-    try:
-        lang = request.accept_languages.best_match(
-            ["it", "en", "es", "fr", "de", "pt", "ro", "ru", "ar", "hi", "ja", "zh"]
-        )
-        return lang or "en"
-    except:
-        return "en"
-
-
-# If you use Groq, keep import; if not available it's optional.
+# Groq API (opzionale)
 try:
     from groq import Groq
 except Exception:
@@ -55,22 +38,17 @@ DEBUG = os.getenv("DEBUG", "0") == "1"
 # App init
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = FLASK_SECRET
+
 if Groq and GROQ_API_KEY:
     client = Groq(api_key=GROQ_API_KEY)
 else:
     client = None
 
-@app.route("/welcome")
-def welcome():
-    return render_template("welcome.html")
-
-
-# Ensure static folders exist
 os.makedirs(STATIC_UPLOADS, exist_ok=True)
 os.makedirs(STATIC_GENERATED, exist_ok=True)
 
 # ---------------------------
-# Persistence helpers
+# Persistence
 # ---------------------------
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -89,19 +67,17 @@ def save_data():
     except Exception as e:
         app.logger.error("save_data error: %s", e)
 
-# Load initial data
 DATA = load_data()
-USERS = DATA.get("users", {})  # dict: username -> user dict
+USERS = DATA.get("users", {})
 VALID_PREMIUM_CODES = set(DATA.get("valid_codes", []))
 USED_PREMIUM_CODES = set(DATA.get("used_codes", []))
 
-# defaults / limits
 FREE_DAILY_LIMIT = int(os.getenv("FREE_DAILY_LIMIT", "20"))
 HISTORY_FREE = int(os.getenv("HISTORY_FREE", "8"))
 HISTORY_PREMIUM = int(os.getenv("HISTORY_PREMIUM", "40"))
 
 # ---------------------------
-# Utility helpers
+# Utility
 # ---------------------------
 def now_ymd():
     return datetime.utcnow().strftime("%Y-%m-%d")
@@ -128,24 +104,10 @@ def persist_users_and_codes():
     DATA["used_codes"] = list(USED_PREMIUM_CODES)
     save_data()
 
-def canonical_pw_hash(pw_plain: str):
-    return bcrypt.hashpw(pw_plain.encode(), bcrypt.gensalt()).decode()
-
-def check_password_hash(maybe_hash, plaintext):
-    # allow bytes or str
-    if isinstance(maybe_hash, str):
-        maybe_hash = maybe_hash.encode()
-    return bcrypt.checkpw(plaintext.encode(), maybe_hash)
-
-def generate_random_guest():
-    return "guest_" + secrets.token_hex(4)
-
 def get_preferred_lang():
-    # use Accept-Language header for best-effort language
     al = request.headers.get("Accept-Language", "")
     if not al:
         return "en"
-    # take first two letters of first tag
     try:
         lang = al.split(",")[0].split("-")[0].lower()
         return lang if lang else "en"
@@ -153,9 +115,8 @@ def get_preferred_lang():
         return "en"
 
 # ---------------------------
-# Admin / login decorators
+# Decorators
 # ---------------------------
-
 def login_required(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -173,7 +134,6 @@ def admin_required(f):
         u = USERS.get(uname)
         if u and u.get("is_admin"):
             return f(*args, **kwargs)
-        # fallback to ADMIN_PASSWORD_ENV via query/header/form
         supplied = request.args.get("admin_pw") or request.form.get("admin_pw") or request.headers.get("X-Admin-Pw")
         if ADMIN_PASSWORD_ENV and supplied == ADMIN_PASSWORD_ENV:
             return f(*args, **kwargs)
@@ -181,7 +141,7 @@ def admin_required(f):
     return wrapped
 
 # ---------------------------
-# Initial demo users (if not present)
+# Initial demo users
 # ---------------------------
 def ensure_demo_users():
     changed = False
@@ -224,36 +184,18 @@ def ensure_demo_users():
 ensure_demo_users()
 
 # ---------------------------
-# History cleanup: non-premium older than 30 days
+# Routes
 # ---------------------------
-def cleanup_history(username):
-    u = USERS.get(username)
-    if not u:
-        return
-    if u.get("premium"):
-        return  # premium keep forever
-    cutoff = time.time() - (30 * 24 * 60 * 60)
-    if "history" in u:
-        u["history"] = [m for m in u["history"] if m.get("ts", 0) >= cutoff]
-        persist_users_and_codes()
-
-# ---------------------------
-# Routes: welcome / guest / auth
-# ---------------------------
-@app.route("/", methods=["GET"])
+@app.route("/")
 def welcome():
-    # show landing with Login / Register / Entra come ospite
-    # detect lang and store in session
     session.setdefault("lang", get_preferred_lang())
     return render_template("welcome.html", lang=session.get("lang", "en"))
 
 @app.route("/guest", methods=["POST"])
 def guest():
-    # create transient guest session: do NOT persist chat history for guests
-    uname = generate_random_guest()
+    uname = "guest_" + secrets.token_hex(4)
     session["username"] = uname
     session["is_guest"] = True
-    # no persistent user entry in USERS
     session.setdefault("lang", get_preferred_lang())
     return redirect(url_for("home"))
 
@@ -264,24 +206,28 @@ def register():
         pw = (request.form.get("password") or "")
 
         if not uname or not pw:
-            return "Username and password required", 400
+            flash("Username e password richiesti")
+            return redirect(url_for("register"))
 
         if uname in USERS:
-            return "Username already exists", 400
+            flash("Username già esistente")
+            return redirect(url_for("register"))
 
         USERS[uname] = {
-            "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()),
+            "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode(),
             "premium": False,
             "is_admin": False,
-            "created_at": "now",
-            "history": []
+            "created_at": datetime.utcnow().isoformat(),
+            "history": [],
+            "daily_count": {"date": now_ymd(), "count": 0}
         }
+        persist_users_and_codes()
 
         session["username"] = uname
+        session["is_guest"] = False
         return redirect(url_for("home"))
 
-    return render_template("auth.html", title="Register", button="Create account")
-
+    return render_template("auth.html", title="Registrazione", button="Crea account")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -290,11 +236,13 @@ def login():
         pw = (request.form.get("password") or "")
 
         if not uname or not pw:
-            return "Username and password required", 400
+            flash("Username e password richiesti")
+            return redirect(url_for("login"))
 
         u = USERS.get(uname)
         if not u:
-            return "Invalid credentials", 400
+            flash("Credenziali non valide")
+            return redirect(url_for("login"))
 
         ph = u.get("password_hash")
         if isinstance(ph, str):
@@ -302,58 +250,37 @@ def login():
 
         if ph and bcrypt.checkpw(pw.encode(), ph):
             session["username"] = uname
+            session["is_guest"] = False
             return redirect(url_for("home"))
 
-        return "Invalid credentials", 400
+        flash("Credenziali non valide")
+        return redirect(url_for("login"))
 
-    return render_template("auth.html", title="Login", button="Login")
+    return render_template("auth.html", title="Login", button="Accedi")
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("welcome"))
 
-@app.route("/guest", methods=["POST"])
-def guest():
-    session["username"] = "guest_" + secrets.token_hex(4)
-    session["guest"] = True
-    USERS[session["username"]] = {
-        "premium": False,
-        "is_admin": False,
-        "created_at": "guest",
-        "history": []
-    }
-    return redirect(url_for("home"))
-
-
-# ---------------------------
-# Home & chat endpoints
-# ---------------------------
 @app.route("/home")
-@login_required
-def home_redirect():
-    return redirect(url_for("home"))
-
-@app.route("/chat-page")
-@login_required
-def chat_page():
-    # older route compatibility; show home
-    return redirect(url_for("home"))
-
-@app.route("/home/", methods=["GET"])
 @login_required
 def home():
     uname = session.get("username")
     is_guest = session.get("is_guest", False)
     u = USERS.get(uname) if not is_guest else None
+    
     plan = "premium" if (u and u.get("premium")) else "free"
     used = user_message_count(u) if u else 0
     history = []
+    
     if u:
-        history = [{"role": m["role"], "content": m["content"]} for m in u.get("history", [])[-(HISTORY_PREMIUM*2):]]
-    # pass buy_link and language
+        max_items = HISTORY_PREMIUM if u.get("premium") else HISTORY_FREE
+        history = [{"role": m["role"], "content": m["content"]} 
+                   for m in u.get("history", [])[-(max_items*2):]]
+    
     return render_template("home.html",
-                           username=(uname if not is_guest else None),
+                           username=(uname if not is_guest else "Ospite"),
                            plan=plan,
                            premium=(u.get("premium") if u else False),
                            created_at=(u.get("created_at") if u else ""),
@@ -370,21 +297,19 @@ def chat():
     uname = session.get("username")
     is_guest = session.get("is_guest", False)
     u = USERS.get(uname) if not is_guest else None
-    if not is_guest and not u:
-        return jsonify({"error": "User not found"}), 400
 
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
     if not message:
-        return jsonify({"error": "Empty message"}), 400
+        return jsonify({"error": "Messaggio vuoto"}), 400
 
-    # daily free limit for non premium
-    if (not is_guest) and (not u.get("premium")):
+    # Controllo limite giornaliero per utenti free
+    if (not is_guest) and u and (not u.get("premium")):
         count = increment_daily(u)
         if count > FREE_DAILY_LIMIT:
-            return jsonify({"error": "Free daily limit reached. Upgrade to premium."}), 429
+            return jsonify({"error": "Limite giornaliero raggiunto. Passa a premium."}), 429
 
-    # prepare history
+    # Prepara cronologia
     max_pairs = HISTORY_PREMIUM if (u and u.get("premium")) else HISTORY_FREE
     recent = (u.get("history", []) if u else [])[-(max_pairs*2):]
     ctx = [{"role": "system", "content": "Sei EMI SUPER BOT. Rispondi nella stessa lingua dell'utente."}]
@@ -392,26 +317,26 @@ def chat():
         ctx.append({"role": m["role"], "content": m["content"]})
     ctx.append({"role": "user", "content": message})
 
-    # select model (if Groq client available)
-    model = "llama-3.1-70b" if (u and u.get("premium")) else "llama-3.1-8b-instant"
+    # Chiamata al modello
+    model = "llama-3.1-70b-versatile" if (u and u.get("premium")) else "llama-3.1-8b-instant"
     ai_text = None
+    
     if client:
         try:
-            resp = client.chat.completions.create(model=model, messages=ctx)
+            resp = client.chat.completions.create(model=model, messages=ctx, max_tokens=1024)
             ai_text = resp.choices[0].message.content
         except Exception as exc:
             app.logger.error("Model API error: %s", exc)
-            ai_text = "Errore interno modello. Prova più tardi."
+            ai_text = "Errore nel modello AI. Riprova più tardi."
     else:
-        # fallback: simple echo / placeholder reply
-        ai_text = f"(simulated reply) I understood: {message[:200]}"
+        ai_text = f"(Risposta simulata) Ho capito: {message[:200]}"
 
-    # store history (unless guest)
-    if not is_guest:
+    # Salva cronologia (non per ospiti)
+    if not is_guest and u:
         now_ts = time.time()
         u.setdefault("history", []).append({"role": "user", "content": message, "ts": now_ts})
-        u.setdefault("history", []).append({"role": "bot", "content": ai_text, "ts": time.time()})
-        # trim to keep size
+        u.setdefault("history", []).append({"role": "assistant", "content": ai_text, "ts": time.time()})
+        
         max_items = (HISTORY_PREMIUM if u.get("premium") else HISTORY_FREE) * 2
         if len(u["history"]) > max_items:
             u["history"] = u["history"][-max_items:]
@@ -419,9 +344,7 @@ def chat():
 
     return jsonify({"reply": ai_text})
 
-# ---------------------------
-# Upload endpoints (images / videos)
-# ---------------------------
+# Upload
 ALLOWED_IMG = {"png", "jpg", "jpeg", "gif", "svg", "webp"}
 ALLOWED_VIDEO = {"mp4", "webm", "mov", "ogg"}
 
@@ -431,66 +354,86 @@ def allowed_file(filename, allowed_set):
 @app.route("/upload", methods=["POST"])
 @login_required
 def upload():
-    # multipart form with 'file' and optional 'caption'
     if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return jsonify({"error": "Nessun file"}), 400
+    
     f = request.files["file"]
     if f.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "File non selezionato"}), 400
+    
     filename = f.filename
     ext = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
+    
     if allowed_file(filename, ALLOWED_IMG.union(ALLOWED_VIDEO)):
         safe_name = secrets.token_hex(8) + "." + ext
         dest = os.path.join(STATIC_UPLOADS, safe_name)
         f.save(dest)
         url = url_for("static", filename=f"uploads/{safe_name}", _external=True)
+        
         uname = session.get("username")
         is_guest = session.get("is_guest", False)
         if not is_guest:
             u = USERS.get(uname)
-            u.setdefault("history", []).append({"role": "user", "content": f"[uploaded file] {url}", "ts": time.time()})
-            persist_users_and_codes()
+            if u:
+                u.setdefault("history", []).append({
+                    "role": "user", 
+                    "content": f"[file caricato] {url}", 
+                    "ts": time.time()
+                })
+                persist_users_and_codes()
+        
         return jsonify({"ok": True, "url": url})
     else:
-        return jsonify({"error": "File type not allowed"}), 400
+        return jsonify({"error": "Tipo di file non consentito"}), 400
 
-# ---------------------------
-# Simple image generator (placeholder: creates colored SVG)
-# ---------------------------
 @app.route("/generate-image", methods=["POST"])
 @login_required
 def generate_image():
     data = request.get_json() or {}
     prompt = (data.get("prompt") or "abstract").strip()[:200]
-    # create a simple SVG image with prompt text and random color
     color = data.get("color") or ("#" + secrets.token_hex(3))
+    
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
   <rect width="100%" height="100%" fill="{color}"/>
   <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
     font-family="Arial" font-size="48" fill="#ffffff">{prompt[:40]}</text>
 </svg>'''
+    
     fname = f"gen_{int(time.time())}_{secrets.token_hex(4)}.svg"
     path = os.path.join(STATIC_GENERATED, fname)
     with open(path, "w", encoding="utf-8") as f:
         f.write(svg)
+    
     url = url_for("static", filename=f"generated/{fname}", _external=True)
+    
     uname = session.get("username")
     if not session.get("is_guest", False):
         u = USERS.get(uname)
-        u.setdefault("history", []).append({"role": "bot", "content": f"[generated image] {url}", "ts": time.time()})
-        persist_users_and_codes()
+        if u:
+            u.setdefault("history", []).append({
+                "role": "assistant", 
+                "content": f"[immagine generata] {url}", 
+                "ts": time.time()
+            })
+            persist_users_and_codes()
+    
     return jsonify({"ok": True, "url": url})
 
-# ---------------------------
-# Admin: list users / generate/revoke codes
-# ---------------------------
+# Admin routes
 @app.route("/admin")
 @admin_required
 def admin():
     uv = {}
     for k, v in USERS.items():
-        uv[k] = {"premium": v.get("premium"), "is_admin": v.get("is_admin"), "created_at": v.get("created_at")}
-    return render_template("admin.html", users=uv, codes=sorted(list(VALID_PREMIUM_CODES)), used=USED_PREMIUM_CODES)
+        uv[k] = {
+            "premium": v.get("premium"), 
+            "is_admin": v.get("is_admin"), 
+            "created_at": v.get("created_at")
+        }
+    return render_template("admin.html", 
+                           users=uv, 
+                           codes=sorted(list(VALID_PREMIUM_CODES)), 
+                           used=USED_PREMIUM_CODES)
 
 @app.route("/admin/generate_codes", methods=["POST"])
 @admin_required
@@ -509,7 +452,7 @@ def admin_generate_codes():
 @admin_required
 def admin_toggle_premium(username):
     if username not in USERS:
-        return "no user", 400
+        return "Utente non trovato", 400
     USERS[username]["premium"] = not USERS[username].get("premium", False)
     persist_users_and_codes()
     return redirect(url_for("admin"))
@@ -531,73 +474,61 @@ def admin_revoke_code():
         persist_users_and_codes()
     return redirect(url_for("admin"))
 
-# ---------------------------
-# Upgrade endpoint: submit code or buy link
-# ---------------------------
 @app.route("/upgrade", methods=["POST"])
 @login_required
 def upgrade():
     uname = session.get("username")
     code = (request.form.get("code") or "").strip()
+    
     if not code:
-        flash("No code provided")
+        flash("Nessun codice fornito")
         return redirect(url_for("home"))
+    
     if code in USED_PREMIUM_CODES:
-        flash("Code already used")
+        flash("Codice già utilizzato")
         return redirect(url_for("home"))
+    
     if code not in VALID_PREMIUM_CODES:
-        flash("Invalid code")
+        flash("Codice non valido")
         return redirect(url_for("home"))
+    
     USED_PREMIUM_CODES.add(code)
-    USERS[uname]["premium"] = True
-    persist_users_and_codes()
-    flash("Upgraded to premium. Thanks!")
+    u = USERS.get(uname)
+    if u:
+        u["premium"] = True
+        persist_users_and_codes()
+        flash("Aggiornato a premium! Grazie!")
+    
     return redirect(url_for("home"))
-
-# ---------------------------
-# Gumroad webhook skeleton (demo)
-# ---------------------------
-def verify_gumroad_signature(payload_bytes, sig_header):
-    if not GUMROAD_SECRET:
-        return True
-    if not sig_header:
-        return False
-    computed = hmac_new(GUMROAD_SECRET.encode(), payload_bytes, sha1).hexdigest()
-    return computed == sig_header
 
 @app.route("/webhook/gumroad", methods=["POST"])
 def gumroad_webhook():
     payload = request.get_data()
     sig = request.headers.get("X-Gumroad-Signature") or request.headers.get("x-gumroad-signature")
-    if GUMROAD_SECRET and not verify_gumroad_signature(payload, sig):
-        return "invalid signature", 403
-    # create code for demo
+    
+    if GUMROAD_SECRET:
+        computed = hmac_new(GUMROAD_SECRET.encode(), payload, sha1).hexdigest()
+        if computed != sig:
+            return "Firma non valida", 403
+    
     code = secrets.token_hex(6)
     VALID_PREMIUM_CODES.add(code)
     persist_users_and_codes()
     return jsonify({"ok": True, "code": code})
 
-# ---------------------------
-# Health
-# ---------------------------
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "ts": time.time()})
 
-# ---------------------------
-# Error handlers (logs)
-# ---------------------------
 @app.errorhandler(500)
 def internal_error(e):
-    app.logger.exception("Internal server error:")
-    return render_template("500.html") if os.path.exists("templates/500.html") else ("Internal Server Error", 500)
+    app.logger.exception("Errore interno del server:")
+    return jsonify({"error": "Errore interno del server"}), 500
 
-# ---------------------------
-# Run
-# ---------------------------
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Pagina non trovata"}), 404
+
 if __name__ == "__main__":
-    # ensure DATA reflects current USERS and codes before run
     persist_users_and_codes()
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
-
-
