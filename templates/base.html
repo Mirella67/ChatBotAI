@@ -1,27 +1,74 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>EMI SUPER BOT</title>
-  <link rel="stylesheet" href="/static/icon.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ title if title else "EMI SUPER BOT" }}</title>
+
+  <meta name="theme-color" content="#667eea" />
+  <link rel="manifest" href="/manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="EMI SUPER BOT">
+  <link rel="icon" href="/static/icon-512.png" sizes="512x512" type="image/png">
+
+  <style>
+    /* minimal global styles */
+    body{font-family:Inter, system-ui, Arial; margin:0; background:#0b1220; color:#e6eef8}
+    header{display:flex;justify-content:space-between;padding:12px 20px;background:rgba(255,255,255,0.02)}
+    .container{max-width:1100px;margin:20px auto;padding:16px}
+    .small{font-size:12px;color:#94a3b8}
+    button.install{background:#667eea;color:white;border:none;padding:8px 12px;border-radius:8px}
+    .icon-512 { width:36px;height:36px;border-radius:8px; background:linear-gradient(135deg,#667eea,#3b82f6);display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700}
+  </style>
 </head>
-<body style="font-family:Inter, system-ui, Arial; background:#0b1220;color:#e6eef8;margin:0;">
-<header style="display:flex;justify-content:space-between;padding:12px 20px;background:rgba(255,255,255,0.02)">
-  <div class="brand"><a href="/" style="color:inherit;text-decoration:none;">EMI SUPER BOT — Premium Top</a></div>
+<body>
+<header>
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="icon-512">E</div>
+    <div><strong>EMI SUPER BOT</strong></div>
+  </div>
   <div>
-    {% if session.username %}
-      <span style="font-size:12px">Ciao, <strong>{{ session.username }}</strong></span>
+    {% if username %}
+      <span class="small">Ciao, <strong>{{ username }}</strong></span>
       &nbsp;&nbsp;
-      <a style="color:#9be7d6" href="{{ url_for('logout') }}">Logout</a>
+      <a class="small" href="{{ url_for('logout') }}">Logout</a>
     {% else %}
-      <a style="color:#9be7d6" href="{{ url_for('login') }}">Login</a> &nbsp;
-      <a style="color:#9be7d6" href="{{ url_for('register') }}">Register</a>
+      <a class="small" href="{{ url_for('login') }}">Login</a> &nbsp;
+      <a class="small" href="{{ url_for('register') }}">Register</a>
     {% endif %}
+    &nbsp;&nbsp;
+    <button id="installBtn" class="install" style="display:none">Installa</button>
   </div>
 </header>
-<main style="max-width:1100px;margin:20px auto;padding:16px;">
+
+<div class="container">
   {% block content %}{% endblock %}
-</main>
+</div>
+
+<script>
+/* Register service worker */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/service-worker.js').then(()=> {
+    console.log('SW registered');
+  }).catch(err => console.log('SW reg failed', err));
+}
+
+/* PWA install prompt handling */
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'inline-block';
+});
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const choice = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+});
+</script>
 </body>
 </html>
