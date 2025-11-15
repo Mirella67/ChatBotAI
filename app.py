@@ -191,6 +191,7 @@ WELCOME_HTML = """
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1rem;
         }
         .container {
             background: white;
@@ -198,7 +199,7 @@ WELCOME_HTML = """
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             max-width: 450px;
-            width: 90%;
+            width: 100%;
         }
         h1 {
             font-size: 2.5rem;
@@ -221,6 +222,9 @@ WELCOME_HTML = """
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            text-decoration: none;
+            display: block;
+            text-align: center;
         }
         .btn-primary {
             background: #667eea;
@@ -232,11 +236,11 @@ WELCOME_HTML = """
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
+            background: #10a37f;
+            color: white;
         }
         .btn-secondary:hover {
-            background: #e0e0e0;
+            background: #0d8c6d;
             transform: translateY(-2px);
         }
         .btn-guest {
@@ -248,21 +252,41 @@ WELCOME_HTML = """
             background: #667eea;
             color: white;
         }
+        .demo-info {
+            background: #f0f7ff;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 2rem;
+            font-size: 0.85rem;
+        }
+        .demo-info h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+        .demo-info code {
+            background: #e0e7ff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🤖 EMI SUPER BOT</h1>
         <p>Il tuo assistente AI intelligente</p>
-        <form action="/login" method="get">
-            <button type="submit" class="btn btn-primary">🔐 Accedi</button>
-        </form>
-        <form action="/register" method="get">
-            <button type="submit" class="btn btn-secondary">✨ Registrati</button>
-        </form>
-        <form action="/guest" method="post">
+        <a href="/register" class="btn btn-secondary">✨ Crea Nuovo Account</a>
+        <a href="/login" class="btn btn-primary">🔐 Accedi</a>
+        <form action="/guest" method="post" style="margin: 0;">
             <button type="submit" class="btn btn-guest">👤 Continua come Ospite</button>
         </form>
+        
+        <div class="demo-info">
+            <h3>🎯 Account Demo Disponibile:</h3>
+            <p style="margin: 0.25rem 0;">Username: <code>admin</code></p>
+            <p style="margin: 0.25rem 0;">Password: <code>admin123</code></p>
+        </div>
     </div>
 </body>
 </html>
