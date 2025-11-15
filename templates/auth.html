@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="max-width:520px;margin:0 auto;background:rgba(255,255,255,0.02);padding:16px;border-radius:12px;">
+<div style="max-width:520px;margin:30px auto;background:#071025;padding:16px;border-radius:10px">
   <h2>{{ title }}</h2>
   <form method="post">
-    <div><label>Username<br><input name="username" required style="width:100%;padding:8px"></label></div>
-    <div><label>Password<br><input name="password" type="password" required style="width:100%;padding:8px"></label></div>
-    <div style="margin-top:8px"><button type="submit">{{ button }}</button></div>
+    <div style="margin-bottom:8px"><label>Username<br><input name="username" required style="width:100%;padding:8px;border-radius:6px"></label></div>
+    <div style="margin-bottom:8px"><label>Password<br><input name="password" type="password" required style="width:100%;padding:8px;border-radius:6px"></label></div>
+    <div><button type="submit" class="install">{{ button }}</button></div>
   </form>
+  <div class="small" style="margin-top:8px">Nota: demo in-memory & file persist. Use DB for produzione.</div>
 </div>
 {% endblock %}
