@@ -5,25 +5,44 @@
 
 <p>Benvenuto amministratore.</p>
 
-<div style="margin-top:20px;">
-    <a href="/logout" class="btn">Logout</a>
-</div>
+<h3 style="margin-top:30px;">User Management</h3>
+
+<table style="width:100%;margin-top:10px;border-collapse:collapse;">
+    <tr style="background:#ddd;">
+        <th style="padding:8px;border:1px solid #bbb;">Username</th>
+        <th style="padding:8px;border:1px solid #bbb;">Premium</th>
+        <th style="padding:8px;border:1px solid #bbb;">Actions</th>
+    </tr>
+
+    {% for u in users %}
+    <tr>
+        <td style="padding:8px;border:1px solid #bbb;">{{ u.username }}</td>
+        <td style="padding:8px;border:1px solid #bbb;">
+            {% if u.premium %}
+                <span style="color:green;font-weight:bold;">YES</span>
+            {% else %}
+                <span style="color:red;font-weight:bold;">NO</span>
+            {% endif %}
+        </td>
+        <td style="padding:8px;border:1px solid #bbb;">
+            {% if not u.premium %}
+                <form method="POST" action="/admin/make_premium" style="display:inline;">
+                    <input type="hidden" name="username" value="{{ u.username }}">
+                    <button class="btn">Make Premium</button>
+                </form>
+            {% else %}
+                <form method="POST" action="/admin/remove_premium" style="display:inline;">
+                    <input type="hidden" name="username" value="{{ u.username }}">
+                    <button class="btn" style="background:#c62828;">Remove Premium</button>
+                </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
 
 <div style="margin-top:40px;">
-    <h3>Utenti registrati</h3>
-
-    {% if users %}
-        <ul>
-            {% for user in users %}
-            <li>
-                <strong>{{ user.email }}</strong> 
-                - Premium: {{ "YES" if user.is_premium else "NO" }}
-            </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Nessun utente trovato.</p>
-    {% endif %}
+    <a href="/logout" class="btn">Logout</a>
 </div>
 
 {% endblock %}
