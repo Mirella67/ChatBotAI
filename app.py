@@ -1,14 +1,18 @@
 """
-app.py — EMI SUPER BOT (Premium Top, single-file, in-memory)
-Features:
+app.py — EMI SUPER BOT (full single-file)
+Features included:
 - Register / Login / Logout
-- Passwords hashed with bcrypt (initial users + generated passwords)
-- Admin panel (create users, generate/revoke premium codes)
-- Premium codes in-memory, webhook skeleton for Gumroad
-- Free vs Premium behaviour: free daily limit, premium unlimited
-- History stored in memory (per-user)
-- Frontend: modern chat UI, typing indicator, admin pages
-- Uses Groq client for model calls (read GROQ_API_KEY from env)
+- Passwords hashed with bcrypt
+- Admin panel (create users, generate/revoke premium codes, toggle premium)
+- Premium codes (admin / webhook)
+- Persistent storage in data.json (users, codes, history)
+- Non-premium chat history auto-pruned after 30 days; premium kept forever
+- Chat endpoints (integrate with Groq client or other LLM)
+- Upload endpoints for images & videos (static/uploads)
+- "Generate" endpoints for images & videos (stubs you must replace with real model calls)
+- Gumroad webhook skeleton + Stripe checkout skeleton
+- Basic PWA meta & manifest links included in HTML templates
+- Comments and instructions in Italian
 """
 
 import os
@@ -19,90 +23,110 @@ from datetime import datetime
 from functools import wraps
 from hashlib import sha1
 from hmac import new as hmac_new
+from pathlib import Path
 
 from flask import (
     Flask, request, jsonify, session, render_template_string,
-    redirect, url_for
+    redirect, url_for, send_from_directory, abort
 )
 import bcrypt
-from groq import Groq  # expected to be installed and usable
+from werkzeug.utils import secure_filename
+
+# Optional: install stripe if you want stripe support
+try:
+    import stripe
+except Exception:
+    stripe = None
+
+# Optional: replace / integrate Groq / other model client here
+try:
+    from groq import Groq
+except Exception:
+    Groq = None
 
 # ---------------------------
-# Configuration / ENV
+# CONFIG / ENV
 # ---------------------------
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
-FLASK_SECRET = os.getenv("FLASK_SECRET", "n9F4n3l0X8vA71K2sP0dF82LwqM1zR6Q")
-ADMIN_PASSWORD_ENV = os.getenv("ADMIN_PASSWORD", None)  # optional quick admin pass
-BUY_LINK = os.getenv("BUY_LINK", "https://your-gumroad-or-pay-link.example")
+DATA_FILE = "data.json"
+UPLOAD_FOLDER = Path("static/uploads")
+GENERATED_FOLDER = Path("static/generated")
+ALLOWED_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "gif"}
+ALLOWED_VIDEO_EXT = {"mp4", "mov", "webm", "mkv"}
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+FLASK_SECRET = os.getenv("FLASK_SECRET", secrets.token_urlsafe(32))
+ADMIN_PASSWORD_ENV = os.getenv("ADMIN_PASSWORD", None)
+BUY_LINK = os.getenv("BUY_LINK", "https://micheleguerra.gumroad.com/l/superchatbot")
 GUMROAD_SECRET = os.getenv("GUMROAD_SECRET", None)
+STRIPE_SECRET = os.getenv("STRIPE_SECRET", None)  # if provided, Stripe integration will work
+STRIPE_PUBLISHABLE = os.getenv("STRIPE_PUBLISHABLE", None)
 PORT = int(os.getenv("PORT", "10000"))
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
-if not FLASK_SECRET:
-    # generate a stable secret for the process lifetime
-    FLASK_SECRET = secrets.token_urlsafe(32)
+# create static folders if missing
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+GENERATED_FOLDER.mkdir(parents=True, exist_ok=True)
 
-if not GROQ_API_KEY:
-    print("WARNING: GROQ_API_KEY is empty. Set it in environment before production.")
-
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = FLASK_SECRET
 
-client = Groq(api_key=GROQ_API_KEY)
+# initialize stripe if available and secret is set
+if stripe and STRIPE_SECRET:
+    stripe.api_key = STRIPE_SECRET
+
+# Groq client (if installed and key present)
+client = Groq(api_key=GROQ_API_KEY) if (Groq and GROQ_API_KEY) else None
 
 # ---------------------------
-# In-memory stores
+# Persistence helpers
 # ---------------------------
-# NOTE: These are created at startup. For persistent production, replace with DB.
-USERS = {}
-VALID_PREMIUM_CODES = set()
-USED_PREMIUM_CODES = set()
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {}
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
-FREE_DAILY_LIMIT = 20            # free messages per day
-HISTORY_FREE = 8                 # last pairs (user+bot) used for context for free
-HISTORY_PREMIUM = 40             # for premium users
+def save_data(data):
+    # write atomically
+    tmp = DATA_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, DATA_FILE)
 
-# ---------------------------
-# INITIAL USERS (hashed passwords inserted)
-# Passwords were generated and hashed below; see assistant message for plaintext.
-# ---------------------------
-# Generated plaintext passwords (for your reference):
-# admin:  sB5Zj_@=ymQ!QGmd
-# utente1: efKgOaM^H0Uiq*
-# premiumtester: CtBVZ2)i!j4AosyT
+DATA = load_data()
 
-USERS["admin"] = {
-    # bcrypt hash of "sB5Zj_@=ymQ!QGmd"
-    "password_hash": bcrypt.hashpw(b"sB5Zj_@=ymQ!QGmd", bcrypt.gensalt()),
-    "premium": True,
-    "is_admin": True,
-    "created_at": datetime.utcnow().isoformat(),
-    "history": [],
-    "daily_count": {"date": datetime.utcnow().strftime("%Y-%m-%d"), "count": 0}
-}
+# initialize in-memory stores from DATA
+USERS = DATA.get("users", {})
+VALID_PREMIUM_CODES = set(DATA.get("valid_codes", []))
+USED_PREMIUM_CODES = set(DATA.get("used_codes", []))
 
-USERS["utente1"] = {
-    # bcrypt hash of "efKgOaM^H0Uiq*"
-    "password_hash": bcrypt.hashpw(b"efKgOaM^H0Uiq*", bcrypt.gensalt()),
-    "premium": False,
-    "is_admin": False,
-    "created_at": datetime.utcnow().isoformat(),
-    "history": [],
-    "daily_count": {"date": datetime.utcnow().strftime("%Y-%m-%d"), "count": 0}
-}
-
-USERS["premiumtester"] = {
-    # bcrypt hash of "CtBVZ2)i!j4AosyT"
-    "password_hash": bcrypt.hashpw(b"CtBVZ2)i!j4AosyT", bcrypt.gensalt()),
-    "premium": True,
-    "is_admin": False,
-    "created_at": datetime.utcnow().isoformat(),
-    "history": [],
-    "daily_count": {"date": datetime.utcnow().strftime("%Y-%m-%d"), "count": 0}
-}
+# ensure admin user exists (for first-run) - you can change password after
+if "admin" not in USERS:
+    pw = "sB5Zj_@=ymQ!QGmd"  # keep or change
+    USERS["admin"] = {
+        "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode(),
+        "premium": True,
+        "is_admin": True,
+        "created_at": datetime.utcnow().isoformat(),
+        "history": [],
+        "daily_count": {"date": datetime.utcnow().strftime("%Y-%m-%d"), "count": 0}
+    }
+    DATA["users"] = USERS
+    save_data(DATA)
 
 # ---------------------------
-# Helpers
+# Config / Limits
+# ---------------------------
+FREE_DAILY_LIMIT = 20
+HISTORY_FREE = 8
+HISTORY_PREMIUM = 40
+NON_PREMIUM_RETENTION_SECONDS = 30 * 24 * 60 * 60  # 30 days
+
+# ---------------------------
+# Helpers / decorators
 # ---------------------------
 def login_required(f):
     @wraps(f)
@@ -121,7 +145,7 @@ def admin_required(f):
         u = USERS.get(uname)
         if u and u.get("is_admin"):
             return f(*args, **kwargs)
-        # fallback to ADMIN_PASSWORD_ENV via query/header/form for convenience
+        # fallback to ADMIN_PASSWORD_ENV via form/query/header
         supplied = request.args.get("admin_pw") or request.form.get("admin_pw") or request.headers.get("X-Admin-Pw")
         if ADMIN_PASSWORD_ENV and supplied == ADMIN_PASSWORD_ENV:
             return f(*args, **kwargs)
@@ -141,6 +165,8 @@ def reset_daily_if_needed(u):
 def increment_daily(u):
     reset_daily_if_needed(u)
     u["daily_count"]["count"] += 1
+    DATA["users"] = USERS
+    save_data(DATA)
     return u["daily_count"]["count"]
 
 def user_message_count(u):
@@ -148,7 +174,6 @@ def user_message_count(u):
     return u["daily_count"]["count"]
 
 def verify_gumroad_signature(payload_bytes, sig_header):
-    # skeleton: adapt if Gumroad uses different scheme
     if not GUMROAD_SECRET:
         return True
     if not sig_header:
@@ -157,7 +182,71 @@ def verify_gumroad_signature(payload_bytes, sig_header):
     return computed == sig_header
 
 # ---------------------------
-# HTML templates (single-file UI)
+# History cleanup for non-premium users (30 days)
+# ---------------------------
+def cleanup_history(username):
+    user = USERS.get(username)
+    if not user:
+        return
+    if user.get("premium"):
+        return
+    cutoff = time.time() - NON_PREMIUM_RETENTION_SECONDS
+    if "history" in user:
+        user["history"] = [msg for msg in user["history"] if msg.get("ts", 0) >= cutoff]
+        DATA["users"] = USERS
+        save_data(DATA)
+
+# ---------------------------
+# Model interaction stubs (replace with actual calls)
+# ---------------------------
+def call_model_chat(context_messages, premium=False):
+    """
+    Replace this with your actual LLM call (Groq/OpenAI/etc).
+    context_messages is a list of dicts {role, content}.
+    Return the assistant reply string.
+    """
+    # Example: if Groq client is available, call it. Otherwise fallback to a canned answer.
+    if client:
+        try:
+            model = "llama-3.1-70b" if premium else "llama-3.1-8b-instant"
+            resp = client.chat.completions.create(model=model, messages=context_messages)
+            return resp.choices[0].message.content
+        except Exception as e:
+            return f"[Model error: {str(e)}]"
+    # fallback canned reply
+    last_user = next((m["content"] for m in reversed(context_messages) if m["role"]=="user"), "")
+    return f"Echo (local stub): {last_user}"
+
+def generate_image_from_prompt(prompt_text, username=None):
+    """
+    Stub for image generation. Replace with real generator.
+    For now, create a simple SVG file or placeholder PNG.
+    Returns relative path to static/generated file.
+    """
+    filename = f"img_{int(time.time())}_{secrets.token_hex(4)}.svg"
+    path = GENERATED_FOLDER / filename
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+      <rect width="100%" height="100%" fill="#667eea"/>
+      <text x="50%" y="50%" font-size="20" fill="#fff" dominant-baseline="middle" text-anchor="middle">EMI Image</text>
+      <text x="50%" y="60%" font-size="12" fill="#fff" dominant-baseline="middle" text-anchor="middle">{prompt_text[:60]}</text>
+    </svg>"""
+    path.write_text(svg, encoding="utf-8")
+    return f"/static/generated/{filename}"
+
+def generate_video_from_prompt(prompt_text, username=None):
+    """
+    Stub for video generation. Replace with real generator.
+    Creates a small placeholder text file renamed .mp4 (not a real video).
+    Replace with real video generation pipeline.
+    """
+    filename = f"vid_{int(time.time())}_{secrets.token_hex(4)}.txt"
+    path = GENERATED_FOLDER / filename
+    path.write_text(f"Placeholder video for prompt: {prompt_text}\nGenerated at {datetime.utcnow().isoformat()}", encoding="utf-8")
+    # return path under static/generated - consumer should handle placeholder
+    return f"/static/generated/{filename}"
+
+# ---------------------------
+# TEMPLATE STRINGS (embedded, so no external templates required)
 # ---------------------------
 BASE_HTML = """
 <!doctype html>
@@ -166,6 +255,8 @@ BASE_HTML = """
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>EMI SUPER BOT — Premium</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#667eea">
   <style>
     body{font-family:Inter, system-ui, Arial; margin:0; background:#0b1220; color:#e6eef8}
     header{display:flex;justify-content:space-between;padding:12px 20px;background:rgba(255,255,255,0.02)}
@@ -185,6 +276,7 @@ BASE_HTML = """
     .small{font-size:12px;color:#94a3b8}
     form.inline{display:flex;gap:8px;align-items:center}
     a.link{color:#9be7d6}
+    .btn{padding:6px 10px;border-radius:6px;background:#3b82f6;color:#fff;border:none}
     @media(max-width:900px){.row{flex-direction:column}.col-3{width:100%}}
   </style>
 </head>
@@ -205,6 +297,12 @@ BASE_HTML = """
 <div class="container">
   {% block content %}{% endblock %}
 </div>
+
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/service-worker.js').catch(()=>console.log('sw registration failed'));
+}
+</script>
 </body>
 </html>
 """
@@ -214,12 +312,12 @@ HOME_HTML = """
 {% block content %}
 <div class="row">
   <div class="col-flex panel">
-    <div class="chat-window">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px">
-        <div><strong>EMI SUPER BOT</strong><div class="small">Assistente intelligente</div></div>
-        <div><span class="small">Plan: <strong>{{ plan|upper }}</strong></span></div>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px">
+      <div><strong>EMI SUPER BOT</strong><div class="small">Assistente intelligente</div></div>
+      <div><span class="small">Plan: <strong>{{ plan|upper }}</strong></span></div>
+    </div>
 
+    <div class="chat-window panel">
       <div class="messages" id="messages">
         {% for m in history %}
           <div class="bubble {{ 'user' if m.role=='user' else 'bot' }}">{{ m.content }}</div>
@@ -230,6 +328,24 @@ HOME_HTML = """
         <textarea id="prompt" placeholder="Scrivi qualcosa..."></textarea>
         <button id="sendBtn">Invia</button>
       </div>
+
+      <div style="display:flex;gap:8px;padding:8px">
+        <form id="uploadForm" enctype="multipart/form-data">
+          <input type="file" id="fileInput" name="file">
+          <button type="button" id="uploadBtn" class="btn">Upload</button>
+        </form>
+
+        <form id="genImageForm">
+          <input id="imgPrompt" placeholder="Prompt per immagine">
+          <button type="button" id="genImageBtn" class="btn">Generate Image</button>
+        </form>
+
+        <form id="genVideoForm">
+          <input id="vidPrompt" placeholder="Prompt per video">
+          <button type="button" id="genVideoBtn" class="btn">Generate Video</button>
+        </form>
+      </div>
+
       <div class="small" style="padding:8px 12px">Limite giornaliero free: {{ free_limit }} — Usati oggi: {{ used_today }}</div>
     </div>
   </div>
@@ -252,7 +368,7 @@ HOME_HTML = """
           <button type="submit">Usa codice</button>
         </form>
         <div style="margin-top:8px">
-          <button onclick="window.open('{{ buy_link }}','_blank')">Compra Premium</button>
+          <button onclick="window.open('{{ buy_link }}','_blank')" class="btn">Compra Premium</button>
         </div>
         {% else %}
         <div class="small">Sei Premium — grazie! 💎</div>
@@ -262,7 +378,7 @@ HOME_HTML = """
 
     <div><strong>Azioni</strong>
       <div style="margin-top:8px">
-        <form action="{{ url_for('clear_history') }}" method="post"><button type="submit">Pulisci cronologia</button></form>
+        <form action="{{ url_for('clear_history') }}" method="post"><button type="submit" class="btn">Pulisci cronologia</button></form>
       </div>
     </div>
 
@@ -309,6 +425,50 @@ sendBtn.addEventListener('click', async ()=>{
     appendMessage(data.reply,'bot');
   }
 });
+
+// file upload
+document.getElementById('uploadBtn').addEventListener('click', async ()=>{
+  const input = document.getElementById('fileInput');
+  if(!input.files.length) return alert('Select a file');
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  const res = await fetch('/upload', {method:'POST', body: fd});
+  const data = await res.json();
+  if(data.ok){
+    appendMessage('Uploaded: ' + data.url, 'bot');
+    // optionally show preview
+  } else alert('Upload failed: ' + data.error);
+});
+
+// generate image
+document.getElementById('genImageBtn').addEventListener('click', async ()=>{
+  const p = document.getElementById('imgPrompt').value.trim();
+  if(!p) return alert('Enter prompt');
+  const res = await fetch('/generate/image', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({prompt:p})
+  });
+  const data = await res.json();
+  if(data.ok){
+    appendMessage('Image: ' + data.url, 'bot');
+  } else appendMessage('Gen failed: '+(data.error||'unknown'),'bot');
+});
+
+// generate video
+document.getElementById('genVideoBtn').addEventListener('click', async ()=>{
+  const p = document.getElementById('vidPrompt').value.trim();
+  if(!p) return alert('Enter prompt');
+  const res = await fetch('/generate/video', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({prompt:p})
+  });
+  const data = await res.json();
+  if(data.ok){
+    appendMessage('Video: ' + data.url, 'bot');
+  } else appendMessage('Gen failed: '+(data.error||'unknown'),'bot');
+});
 </script>
 {% endblock %}
 """
@@ -322,9 +482,9 @@ AUTH_HTML = """
     <div style="margin-bottom:8px"><label>Username<br><input name="username" required style="width:100%;padding:8px;border-radius:6px"></label></div>
     <div style="margin-bottom:8px"><label>Password<br><input name="password" type="password" required style="width:100%;padding:8px;border-radius:6px"></label></div>
     {% if extra %}<div style="margin-bottom:8px">{{ extra }}</div>{% endif %}
-    <div><button type="submit">{{ button }}</button></div>
+    <div><button type="submit" class="btn">{{ button }}</button></div>
   </form>
-  <div class="small" style="margin-top:8px">Nota: demo in-memory. Cambia password e usa DB per produzione.</div>
+  <div class="small" style="margin-top:8px">Nota: demo in-memory + JSON persistence. Usa DB per produzione.</div>
 </div>
 {% endblock %}
 """
@@ -335,55 +495,65 @@ ADMIN_HTML = """
 <div class="panel">
   <h2>Admin Panel</h2>
 
-  <div style="margin-top:12px">
-    <h3>Utenti</h3>
-    <table style="width:100%;border-collapse:collapse">
-      <tr><th>Name</th><th>Premium</th><th>Admin</th><th>Created</th><th>Actions</th></tr>
-      {% for uname,u in users.items() %}
+  <h3>Users</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr><th>Username</th><th>Premium</th><th>Admin</th><th>Created</th><th>Actions</th></tr>
+    {% for u in users %}
       <tr>
-        <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">{{ uname }}</td>
+        <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">{{ u.username }}</td>
         <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">{{ 'YES' if u.premium else 'NO' }}</td>
         <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">{{ 'YES' if u.is_admin else 'NO' }}</td>
         <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">{{ u.created_at }}</td>
         <td style="padding:6px;border-top:1px solid rgba(255,255,255,0.02)">
-          <form style="display:inline" action="{{ url_for('admin_toggle_premium', username=uname) }}" method="post"><button type="submit">Toggle Premium</button></form>
-          <form style="display:inline" action="{{ url_for('admin_delete_user', username=uname) }}" method="post"><button type="submit">Delete</button></form>
+          {% if not u.premium %}
+            <form method="post" action="/admin/make_premium" style="display:inline;">
+              <input type="hidden" name="username" value="{{ u.username }}">
+              <button class="btn">Make Premium</button>
+            </form>
+          {% else %}
+            <form method="post" action="/admin/remove_premium" style="display:inline;">
+              <input type="hidden" name="username" value="{{ u.username }}">
+              <button class="btn" style="background:#c62828;">Remove Premium</button>
+            </form>
+          {% endif %}
+          <form method="post" action="/admin/delete_user" style="display:inline;">
+            <input type="hidden" name="username" value="{{ u.username }}">
+            <button class="btn" style="background:#333;">Delete</button>
+          </form>
         </td>
       </tr>
-      {% endfor %}
-    </table>
-  </div>
+    {% endfor %}
+  </table>
+
+  <h3 style="margin-top:20px;">Generate Premium Codes</h3>
+  <form method="post" action="/admin/generate_codes">
+    <input name="n" type="number" value="3" min="1" max="200">
+    <button class="btn">Generate</button>
+  </form>
 
   <div style="margin-top:12px">
-    <h3>Generate Premium Codes</h3>
-    <form method="post" action="{{ url_for('admin_generate_codes') }}">
-      <input name="n" type="number" value="3" min="1" max="200">
-      <button type="submit">Generate</button>
-    </form>
-    <div style="margin-top:8px"><strong>Valid codes</strong>
-      <div style="background:#061220;padding:8px;border-radius:6px;max-height:160px;overflow:auto">
-        {% for c in codes %}
-          <div>{{ c }} {% if c in used %}<span class="small"> (USED)</span>{% endif %}</div>
-        {% endfor %}
-      </div>
+    <strong>Valid codes</strong>
+    <div style="background:#061220;padding:8px;border-radius:6px;max-height:160px;overflow:auto">
+      {% for c in codes %}
+        <div>{{ c }} {% if c in used %}<span class="small"> (USED)</span>{% endif %}</div>
+      {% endfor %}
     </div>
   </div>
 
-  <div style="margin-top:12px">
-    <h3>Create user</h3>
-    <form method="post" action="{{ url_for('admin_create_user') }}">
-      <input name="username" placeholder="username" required>
-      <input name="password" placeholder="password" required>
-      <label><input type="checkbox" name="is_admin"> is admin</label>
-      <button type="submit">Create</button>
-    </form>
-  </div>
+  <h3 style="margin-top:20px;">Create user</h3>
+  <form method="post" action="/admin/create_user">
+    <input name="username" placeholder="username" required>
+    <input name="password" placeholder="password" required>
+    <label><input type="checkbox" name="is_admin"> is admin</label>
+    <button class="btn">Create</button>
+  </form>
+
 </div>
 {% endblock %}
 """
 
 # ---------------------------
-# Routes: Register / Login / Logout
+# Routes: auth
 # ---------------------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -395,13 +565,15 @@ def register():
         if uname in USERS:
             return "Username already exists", 400
         USERS[uname] = {
-            "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()),
+            "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode(),
             "premium": False,
             "is_admin": False,
             "created_at": datetime.utcnow().isoformat(),
             "history": [],
             "daily_count": {"date": now_ymd(), "count": 0}
         }
+        DATA["users"] = USERS
+        save_data(DATA)
         session["username"] = uname
         return redirect(url_for("home"))
     return render_template_string(AUTH_HTML, base=BASE_HTML, title="Register", button="Create account", extra=None, username=None)
@@ -416,7 +588,7 @@ def login():
         u = USERS.get(uname)
         if not u:
             return "Invalid credentials", 400
-        if bcrypt.checkpw(pw.encode(), u["password_hash"]):
+        if bcrypt.checkpw(pw.encode(), u["password_hash"].encode() if isinstance(u["password_hash"], str) else u["password_hash"]):
             session["username"] = uname
             return redirect(url_for("home"))
         return "Invalid credentials", 400
@@ -428,16 +600,18 @@ def logout():
     return redirect(url_for("login"))
 
 # ---------------------------
-# Home & Chat
+# Home & chat endpoints
 # ---------------------------
 @app.route("/")
 @login_required
 def home():
     uname = session.get("username")
-    u = USERS.get(uname)
+    u = USERS.get(uname, {})
     plan = "premium" if u.get("premium") else "free"
     used = user_message_count(u)
-    history = [{"role": m["role"], "content": m["content"]} for m in u.get("history", [])[-(HISTORY_PREMIUM*2):]]
+    history_list = u.get("history", [])[-(HISTORY_PREMIUM*2):] if u.get("history") else []
+    # convert to objects with attributes for Jinja loops
+    history = [{"role": item["role"], "content": item["content"]} for item in history_list]
     return render_template_string(
         HOME_HTML, base=BASE_HTML, username=uname, plan=plan, premium=u.get("premium"),
         created_at=u.get("created_at"), buy_link=BUY_LINK, history=history,
@@ -452,6 +626,9 @@ def chat():
     if not u:
         return jsonify({"error": "User not found"}), 400
 
+    # cleanup old history automatically for non-premium
+    cleanup_history(uname)
+
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
     if not message:
@@ -463,35 +640,118 @@ def chat():
         if count > FREE_DAILY_LIMIT:
             return jsonify({"error": "Free daily limit reached. Upgrade to premium."}), 429
 
-    # prepare history (last N messages)
+    # prepare context
     max_pairs = HISTORY_PREMIUM if u.get("premium") else HISTORY_FREE
-    recent = u.get("history", [])[-(max_pairs*2):]
+    recent = u.get("history", [])[-(max_pairs*2):] if u.get("history") else []
     ctx = [{"role":"system", "content":"Sei EMI SUPER BOT. Rispondi nella stessa lingua dell'utente."}]
-    for m in recent:
-        ctx.append({"role": m["role"], "content": m["content"]})
-    ctx.append({"role": "user", "content": message})
+    ctx.extend([{"role":m["role"], "content": m["content"]} for m in recent])
+    ctx.append({"role":"user","content":message})
 
-    # select model
-    model = "llama-3.1-70b" if u.get("premium") else "llama-3.1-8b-instant"
-
+    # call the model (stub or real)
     try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=ctx
-        )
-        ai_text = resp.choices[0].message.content
+        ai_text = call_model_chat(ctx, premium=u.get("premium"))
     except Exception as exc:
         return jsonify({"error": f"Model API error: {str(exc)}"}), 500
 
-    # store history
+    # store history (with ts)
     u.setdefault("history", []).append({"role":"user","content": message, "ts": time.time()})
     u.setdefault("history", []).append({"role":"bot","content": ai_text, "ts": time.time()})
-    # trim
+
+    # trim by max items
     max_items = (HISTORY_PREMIUM if u.get("premium") else HISTORY_FREE) * 2
     if len(u["history"]) > max_items:
         u["history"] = u["history"][-max_items:]
 
+    DATA["users"] = USERS
+    save_data(DATA)
+
     return jsonify({"reply": ai_text})
+
+# ---------------------------
+# Upload endpoint
+# ---------------------------
+def allowed_file(filename, kind=None):
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if kind == "image":
+        return ext in ALLOWED_IMAGE_EXT
+    if kind == "video":
+        return ext in ALLOWED_VIDEO_EXT
+    # auto-check both
+    return ext in ALLOWED_IMAGE_EXT.union(ALLOWED_VIDEO_EXT)
+
+@app.route("/upload", methods=["POST"])
+@login_required
+def upload():
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file part"}), 400
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"ok": False, "error": "No selected file"}), 400
+
+    filename = secure_filename(file.filename)
+    if not allowed_file(filename):
+        return jsonify({"ok": False, "error": "File type not allowed"}), 400
+
+    # save
+    out_name = f"{int(time.time())}_{secrets.token_hex(6)}_{filename}"
+    out_path = UPLOAD_FOLDER / out_name
+    file.save(out_path)
+
+    url = f"/static/uploads/{out_name}"
+    return jsonify({"ok": True, "url": url})
+
+# ---------------------------
+# Generation endpoints (image/video)
+# ---------------------------
+@app.route("/generate/image", methods=["POST"])
+@login_required
+def generate_image():
+    data = request.get_json() or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"ok": False, "error": "Empty prompt"}), 400
+
+    uname = session.get("username")
+    u = USERS.get(uname)
+
+    # check daily limits for non-premium if you want to charge generation separately
+    # (omitted for brevity)
+
+    try:
+        url = generate_image_from_prompt(prompt, username=uname)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    # optionally store a reference in user history
+    u.setdefault("history", []).append({"role":"user","content": f"[generated image prompt] {prompt}", "ts": time.time()})
+    u.setdefault("history", []).append({"role":"bot","content": f"[image generated] {url}", "ts": time.time()})
+    DATA["users"] = USERS
+    save_data(DATA)
+
+    return jsonify({"ok": True, "url": url})
+
+@app.route("/generate/video", methods=["POST"])
+@login_required
+def generate_video():
+    data = request.get_json() or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"ok": False, "error": "Empty prompt"}), 400
+
+    uname = session.get("username")
+    u = USERS.get(uname)
+
+    try:
+        url = generate_video_from_prompt(prompt, username=uname)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    u.setdefault("history", []).append({"role":"user","content": f"[generated video prompt] {prompt}", "ts": time.time()})
+    u.setdefault("history", []).append({"role":"bot","content": f"[video generated] {url}", "ts": time.time()})
+    DATA["users"] = USERS
+    save_data(DATA)
+
+    return jsonify({"ok": True, "url": url})
 
 # ---------------------------
 # Account actions
@@ -509,6 +769,10 @@ def upgrade():
         return "Invalid code", 400
     USED_PREMIUM_CODES.add(code)
     USERS[uname]["premium"] = True
+    DATA["users"] = USERS
+    DATA["valid_codes"] = list(VALID_PREMIUM_CODES)
+    DATA["used_codes"] = list(USED_PREMIUM_CODES)
+    save_data(DATA)
     return redirect(url_for("home"))
 
 @app.route("/clear_history", methods=["POST"])
@@ -516,6 +780,8 @@ def upgrade():
 def clear_history():
     uname = session.get("username")
     USERS[uname]["history"] = []
+    DATA["users"] = USERS
+    save_data(DATA)
     return redirect(url_for("home"))
 
 # ---------------------------
@@ -524,10 +790,56 @@ def clear_history():
 @app.route("/admin")
 @admin_required
 def admin():
-    uv = {}
-    for k,v in USERS.items():
-        uv[k] = type("U", (), {"premium": v.get("premium"), "is_admin": v.get("is_admin"), "created_at": v.get("created_at")})
-    return render_template_string(ADMIN_HTML, base=BASE_HTML, users=uv, codes=sorted(list(VALID_PREMIUM_CODES)), used=USED_PREMIUM_CODES, username=session.get("username"))
+    uv = []
+    for username, data in USERS.items():
+        uv.append({
+            "username": username,
+            "premium": data.get("premium"),
+            "is_admin": data.get("is_admin"),
+            "created_at": data.get("created_at")
+        })
+
+    return render_template_string(
+        ADMIN_HTML,
+        base=BASE_HTML,
+        users=uv,
+        codes=sorted(list(VALID_PREMIUM_CODES)),
+        used=USED_PREMIUM_CODES
+    )
+
+@app.route("/admin/make_premium", methods=["POST"])
+@admin_required
+def make_premium():
+    username = request.form.get("username")
+    if not username:
+        return redirect(url_for("admin"))
+    if username in USERS:
+        USERS[username]["premium"] = True
+        DATA["users"] = USERS
+        save_data(DATA)
+    return redirect(url_for("admin"))
+
+@app.route("/admin/remove_premium", methods=["POST"])
+@admin_required
+def remove_premium():
+    username = request.form.get("username")
+    if not username:
+        return redirect(url_for("admin"))
+    if username in USERS:
+        USERS[username]["premium"] = False
+        DATA["users"] = USERS
+        save_data(DATA)
+    return redirect(url_for("admin"))
+
+@app.route("/admin/delete_user", methods=["POST"])
+@admin_required
+def admin_delete_user():
+    username = request.form.get("username")
+    if username in USERS:
+        del USERS[username]
+        DATA["users"] = USERS
+        save_data(DATA)
+    return redirect(url_for("admin"))
 
 @app.route("/admin/generate_codes", methods=["POST"])
 @admin_required
@@ -539,6 +851,8 @@ def admin_generate_codes():
         code = secrets.token_hex(6)
         VALID_PREMIUM_CODES.add(code)
         created.append(code)
+    DATA["valid_codes"] = list(VALID_PREMIUM_CODES)
+    save_data(DATA)
     return jsonify({"created": created})
 
 @app.route("/admin/create_user", methods=["POST"])
@@ -552,13 +866,15 @@ def admin_create_user():
     if uname in USERS:
         return "exists", 400
     USERS[uname] = {
-        "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()),
+        "password_hash": bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode(),
         "premium": False,
         "is_admin": is_admin,
         "created_at": datetime.utcnow().isoformat(),
         "history": [],
         "daily_count": {"date": now_ymd(), "count": 0}
     }
+    DATA["users"] = USERS
+    save_data(DATA)
     return redirect(url_for("admin"))
 
 @app.route("/admin/toggle_premium/<username>", methods=["POST"])
@@ -567,13 +883,8 @@ def admin_toggle_premium(username):
     if username not in USERS:
         return "no user", 400
     USERS[username]["premium"] = not USERS[username].get("premium", False)
-    return redirect(url_for("admin"))
-
-@app.route("/admin/delete_user/<username>", methods=["POST"])
-@admin_required
-def admin_delete_user(username):
-    if username in USERS:
-        del USERS[username]
+    DATA["users"] = USERS
+    save_data(DATA)
     return redirect(url_for("admin"))
 
 # ---------------------------
@@ -590,6 +901,8 @@ def admin_revoke_code():
     code = request.form.get("code")
     if code in VALID_PREMIUM_CODES:
         VALID_PREMIUM_CODES.remove(code)
+        DATA["valid_codes"] = list(VALID_PREMIUM_CODES)
+        save_data(DATA)
     return redirect(url_for("admin"))
 
 # ---------------------------
@@ -602,11 +915,52 @@ def gumroad_webhook():
     if GUMROAD_SECRET:
         if not verify_gumroad_signature(payload, sig):
             return "invalid signature", 403
-    data = request.form.to_dict() or request.get_json(silent=True) or {}
-    # create code per purchase (demo). In production, email the buyer
+    # demo: create a premium code for each purchase
     code = secrets.token_hex(6)
     VALID_PREMIUM_CODES.add(code)
+    DATA["valid_codes"] = list(VALID_PREMIUM_CODES)
+    save_data(DATA)
     return jsonify({"ok": True, "code": code})
+
+# ---------------------------
+# Stripe checkout skeleton (if stripe is configured)
+# ---------------------------
+@app.route("/create-checkout-session", methods=["POST"])
+@login_required
+def create_checkout_session():
+    if not stripe:
+        return jsonify({"error": "Stripe not available on server"}), 500
+    # price_id must be configured on Stripe dashboard; replace below
+    price_id = os.getenv("STRIPE_PRICE_ID")
+    if not price_id:
+        return jsonify({"error": "STRIPE_PRICE_ID not configured"}), 500
+    domain = request.host_url.rstrip("/")
+    try:
+        session_obj = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='payment',
+            success_url=domain + '/stripe-success?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=domain + '/stripe-cancel',
+        )
+        return jsonify({"url": session_obj.url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/stripe-success")
+def stripe_success():
+    # in production verify session and map to user; here show success page
+    return "<h1>Payment successful</h1><p>Contact admin to activate premium automatically or use webhook integration.</p>"
+
+# ---------------------------
+# Gumroad / Stripe webhook for issuing codes or activating premium
+# (You must secure and verify payloads in production)
+# ---------------------------
+@app.route("/webhook/stripe", methods=["POST"])
+def stripe_webhook():
+    # skeleton: verify signature using stripe library and your endpoint secret
+    # then generate code or mark user premium (you need to map email to username)
+    return jsonify({"ok": True})
 
 # ---------------------------
 # Health
@@ -616,8 +970,46 @@ def health():
     return jsonify({"status": "ok", "ts": time.time()})
 
 # ---------------------------
+# PWA manifest + service worker endpoints (simple)
+# ---------------------------
+@app.route("/manifest.json")
+def manifest():
+    mf = {
+        "name": "EMI SUPER BOT",
+        "short_name": "EMI",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0b1220",
+        "theme_color": "#667eea",
+        "icons": [
+            {"src": "/static/icon-192.png", "sizes":"192x192", "type":"image/png"},
+            {"src": "/static/icon-512.png", "sizes":"512x512", "type":"image/png"}
+        ]
+    }
+    return jsonify(mf)
+
+# very small service worker that does nothing critical; if you want offline cache extend it
+@app.route("/service-worker.js")
+def service_worker():
+    js = """
+self.addEventListener('install', function(e){ self.skipWaiting(); });
+self.addEventListener('activate', function(e){ self.clients.claim(); });
+self.addEventListener('fetch', function(e){ /* you can add caching logic here */ });
+"""
+    return app.response_class(js, mimetype="application/javascript")
+
+# ---------------------------
+# Static generated/download endpoints handled by Flask static folder
+# ---------------------------
+
+# ---------------------------
 # Run
 # ---------------------------
 if __name__ == "__main__":
-    print("EMI SUPER BOT starting. Set GROQ_API_KEY in env before production.")
+    print("EMI SUPER BOT starting. Fill env vars for GROQ/STRIPE if needed.")
+    # ensure data persisted before start
+    DATA["users"] = USERS
+    DATA["valid_codes"] = list(VALID_PREMIUM_CODES)
+    DATA["used_codes"] = list(USED_PREMIUM_CODES)
+    save_data(DATA)
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
