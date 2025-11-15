@@ -1,91 +1,65 @@
-<!doctype html>
-<html lang="it">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>EMI SUPER BOT — Premium</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#667eea">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#667eea" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
-  <!-- Icona CSS -->
-  <style>
-    .app-icon {
-      width: 120px;
-      height: 120px;
-      border-radius: 28px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      font-size:54px;
-      color:white;
-      font-weight:900;
-      user-select:none;
-    }
-  </style>
+    <title>{{ title if title else "SuperBot" }}</title>
 
-  <style>
-    body{font-family:Inter, system-ui, Arial; margin:0; background:#0b1220; color:#e6eef8}
-    header{display:flex;justify-content:space-between;padding:12px 20px;background:rgba(255,255,255,0.02)}
-    .container{max-width:1100px;margin:20px auto;padding:16px}
-    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px;padding:16px;}
-    .row{display:flex;gap:16px}
-    .col-3{width:320px}
-    .col-flex{flex:1}
-    .chat-window{height:520px; display:flex; flex-direction:column}
-    .messages{flex:1; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:8px}
-    .bubble{max-width:72%; padding:10px 12px; border-radius:12px}
-    .bubble.bot{align-self:flex-start; background:rgba(255,255,255,0.04)}
-    .bubble.user{align-self:flex-end; background:linear-gradient(90deg,#0ea5a4,#06b6d4)}
-    .controls{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.02)}
-    textarea{flex:1; min-height:56px; border-radius:8px; background:transparent; color:inherit; border:1px solid rgba(255,255,255,0.04); padding:8px}
-    button{background:#10b981;border:none;color:#012018;padding:10px 14px;border-radius:8px;font-weight:700}
-    .small{font-size:12px;color:#94a3b8}
-    form.inline{display:flex;gap:8px;align-items:center}
-    a.link{color:#9be7d6}
-    @media(max-width:900px){.row{flex-direction:column}.col-3{width:100%}}
-  </style>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f8f8ff;
+        }
+        nav {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .container {
+            width: 90%;
+            margin: auto;
+            padding: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 15px;
+            background: #667eea;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            border: none;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
 </head>
 
 <body>
 
-<header>
-  <div class="brand">EMI SUPER BOT — Premium Top</div>
-  <div>
-    {% if username %}
-      <span class="small">Ciao, <strong>{{ username }}</strong></span>
-      &nbsp;&nbsp;
-      <a class="link" href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-      <a class="link" href="{{ url_for('login') }}">Login</a> &nbsp;
-      <a class="link" href="{{ url_for('register') }}">Register</a>
-    {% endif %}
-  </div>
-</header>
+<nav>SuperBot</nav>
 
 <div class="container">
-  {% block content %}{% endblock %}
+    {% block content %}{% endblock %}
 </div>
 
-<!-- PWA install script -->
 <script>
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e)=>{
-  e.preventDefault();
-  deferredPrompt = e;
-  const btn = document.getElementById("installBtn");
-  if(btn) btn.style.display="block";
-});
-
-function installPWA(){
-  if(!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt = null;
-}
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/service-worker.js");
+    }
 </script>
 
 </body>
