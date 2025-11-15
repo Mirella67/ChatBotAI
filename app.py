@@ -45,16 +45,16 @@ DATA_FILE = Path("data.json")
 STATIC_UPLOADS = Path("static/uploads")
 STATIC_GENERATED = Path("static/generated")
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 FLASK_SECRET = os.getenv("FLASK_SECRET", secrets.token_urlsafe(32))
 ADMIN_PASSWORD_ENV = os.getenv("ADMIN_PASSWORD", None)
-BUY_LINK = os.getenv("BUY_LINK", "https://your-gumroad-or-pay-link.example")
-GUMROAD_SECRET = os.getenv("GUMROAD_SECRET", "")
+BUY_LINK = os.getenv("BUY_LINK", "https://micheleguerra.gumroad.com/l/superchatbot")
+GUMROAD_SECRET = os.getenv("GUMROAD_SECRET", "Oj1cMSfl8dMGVErP9K_Q5CcH8Lcv2PoPegmckxiInlM")
 PORT = int(os.getenv("PORT", "10000"))
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
 # Stripe (opzionale)
-STRIPE_SECRET = os.getenv("STRIPE_SECRET", "")
+STRIPE_SECRET = os.getenv("STRIPE_SECRET", "sk_test_51STm5SE2hyzVsiR5fSg1cRbETfpphlO4WZTU5fA7XizWSVCTmB30bDO3yC1xQI0EwApd5C5EkRfngMDXEUYMytuA00QUKuGqCd")
 if stripe and STRIPE_SECRET:
     stripe.api_key = STRIPE_SECRET
 
@@ -660,3 +660,4 @@ def health():
 if __name__ == "__main__":
     print("EMI SUPER BOT starting. Set GROQ_API_KEY / STRIPE_SECRET in env if needed.")
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
+
