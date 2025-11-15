@@ -29,6 +29,20 @@ from flask import (
 )
 import bcrypt
 
+def detect_language_from_request():
+    accept = request.headers.get("Accept-Language", "").lower()
+    if "it" in accept: return "it"
+    if "es" in accept: return "es"
+    if "fr" in accept: return "fr"
+    if "de" in accept: return "de"
+    if "pt" in accept: return "pt"
+    if "en" in accept: return "en"
+    return "en"  # default
+
+def set_session_language():
+    if "lang" not in session:
+        session["lang"] = detect_language_from_request()
+
 # If you use Groq / OpenAI, import their client and configure below.
 # from groq import Groq
 # client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
@@ -150,6 +164,27 @@ def persist_state():
 # ---------------------------
 # Helpers
 # ---------------------------
+
+@app.route("/welcome")
+def welcome():
+    set_session_language()
+    return render_template("welcome.html")
+
+@app.route("/guest", methods=["POST"])
+def guest():
+    session["username"] = "guest_" + secrets.token_hex(4)
+    USERS[session["username"]] = {
+        "premium": False,
+        "is_admin": False,
+        "password_hash": None,
+        "created_at": "guest",
+        "history": [],
+        "daily_count": {"date": now_ymd(), "count": 0}
+    }
+    session["is_guest"] = True
+    return redirect(url_for("home"))
+
+
 def login_required(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -559,6 +594,10 @@ app.secret_key = FLASK_SECRET
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if request.method == "GET":
+    set_session_language()
+    return render_template("auth.html", title="Login")
+     
     if request.method == "POST":
         uname = (request.form.get("username") or "").strip()
         pw = (request.form.get("password") or "")
@@ -865,4 +904,5 @@ def generated_file(filename):
 if __name__ == "__main__":
     print("EMI SUPER BOT starting. Set GROQ_API_KEY in env before production.")
     app.run(host="0.0.0.0", port=PORT, debug=DEBUG)
+
 
