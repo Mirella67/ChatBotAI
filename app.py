@@ -395,43 +395,102 @@ CHAT_HTML = """
             width: 260px;
             height: 100vh;
             background: #202123;
-            padding: 1rem;
+            padding: 0.5rem;
             display: flex;
             flex-direction: column;
             z-index: 100;
+        }
+        .sidebar-header {
+            padding: 0.75rem;
+            border-bottom: 1px solid #444654;
+            margin-bottom: 0.5rem;
+        }
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ececf1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         .new-chat-btn {
             background: transparent;
             border: 1px solid #565869;
             color: #ececf1;
             padding: 0.75rem;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            font-size: 0.9rem;
             transition: background 0.2s;
         }
         .new-chat-btn:hover {
             background: #343541;
         }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        .chat-history-item {
+            padding: 0.75rem;
+            margin: 0.25rem 0;
+            border-radius: 6px;
+            color: #ececf1;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chat-history-item:hover {
+            background: #343541;
+        }
         .user-info {
-            margin-top: auto;
-            padding: 1rem;
-            border-top: 1px solid #565869;
+            padding: 0.75rem;
+            border-top: 1px solid #444654;
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .user-profile:hover {
+            background: #343541;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .user-details {
+            flex: 1;
         }
         .user-name {
             font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: #ececf1;
+            margin-bottom: 0.1rem;
         }
         .plan-badge {
             display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
         }
         .plan-free {
             background: #565869;
@@ -441,28 +500,52 @@ CHAT_HTML = """
             background: linear-gradient(135deg, #ffd700, #ffed4e);
             color: #000;
         }
-        .usage {
-            font-size: 0.85rem;
+        .plan-guest {
+            background: #444654;
             color: #8e8ea0;
-            margin-bottom: 0.5rem;
         }
-        .upgrade-btn, .logout-btn {
+        .usage {
+            font-size: 0.8rem;
+            color: #8e8ea0;
+            margin: 0.5rem 0;
+        }
+        .sidebar-btn {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.65rem;
             margin-top: 0.5rem;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 0.85rem;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
         .upgrade-btn {
             background: linear-gradient(135deg, #ffd700, #ffed4e);
             color: #000;
         }
         .upgrade-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+        .register-btn {
+            background: #10a37f;
+            color: white;
+        }
+        .register-btn:hover {
+            background: #0d8c6d;
+        }
+        .login-btn {
+            background: transparent;
+            border: 1px solid #565869;
+            color: #ececf1;
+        }
+        .login-btn:hover {
+            background: #343541;
         }
         .logout-btn {
             background: transparent;
@@ -471,6 +554,12 @@ CHAT_HTML = """
         }
         .logout-btn:hover {
             background: #343541;
+        }
+        .guest-message {
+            font-size: 0.8rem;
+            color: #8e8ea0;
+            margin: 0.5rem 0;
+            line-height: 1.4;
         }
         
         /* MAIN CHAT */
@@ -669,38 +758,58 @@ CHAT_HTML = """
 <body>
     <!-- SIDEBAR -->
     <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">🤖 EMI BOT</div>
+        </div>
+        
         <button class="new-chat-btn" onclick="location.reload()">
-            ➕ Nuova Chat
+            <span>➕</span>
+            <span>Nuova chat</span>
         </button>
         
+        <div class="sidebar-content">
+            <!-- Qui potrebbero andare le chat salvate -->
+        </div>
+        
         <div class="user-info">
-            <div class="user-name">👤 {{ username }}</div>
             {% if is_guest %}
-            <span class="plan-badge plan-free">OSPITE</span>
-            <p style="font-size: 0.85rem; color: #8e8ea0; margin: 0.5rem 0;">
-                Crea un account per salvare le tue conversazioni!
-            </p>
-            <button class="upgrade-btn" onclick="location.href='/register'">
-                ✨ Registrati
-            </button>
-            <button class="logout-btn" onclick="location.href='/login'">
-                🔐 Accedi
-            </button>
+                <div class="user-profile">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-details">
+                        <div class="user-name">Ospite</div>
+                        <span class="plan-badge plan-guest">TEMPORANEO</span>
+                    </div>
+                </div>
+                <p class="guest-message">Registrati per salvare le conversazioni e accedere da qualsiasi dispositivo</p>
+                <button class="sidebar-btn register-btn" onclick="location.href='/register'">
+                    <span>✨</span>
+                    <span>Crea account</span>
+                </button>
+                <button class="sidebar-btn login-btn" onclick="location.href='/login'">
+                    <span>🔐</span>
+                    <span>Ho già un account</span>
+                </button>
             {% else %}
-            <span class="plan-badge {{ 'plan-premium' if premium else 'plan-free' }}">
-                {{ 'PREMIUM ⭐' if premium else 'FREE' }}
-            </span>
-            {% if not premium %}
-            <div class="usage">Messaggi: {{ used_today }}/{{ free_limit }}</div>
-            {% endif %}
-            {% if not premium %}
-            <button class="upgrade-btn" onclick="showPremium()">
-                ⭐ Passa a Premium
-            </button>
-            {% endif %}
-            <button class="logout-btn" onclick="location.href='/logout'">
-                🚪 Logout
-            </button>
+                <div class="user-profile">
+                    <div class="user-avatar">{{ username[0].upper() }}</div>
+                    <div class="user-details">
+                        <div class="user-name">{{ username }}</div>
+                        <span class="plan-badge {{ 'plan-premium' if premium else 'plan-free' }}">
+                            {{ 'PREMIUM' if premium else 'FREE' }}
+                        </span>
+                    </div>
+                </div>
+                {% if not premium %}
+                <div class="usage">📊 Messaggi oggi: {{ used_today }}/{{ free_limit }}</div>
+                <button class="sidebar-btn upgrade-btn" onclick="showPremium()">
+                    <span>⭐</span>
+                    <span>Passa a Premium</span>
+                </button>
+                {% endif %}
+                <button class="sidebar-btn logout-btn" onclick="location.href='/logout'">
+                    <span>🚪</span>
+                    <span>Esci</span>
+                </button>
             {% endif %}
         </div>
     </div>
@@ -942,6 +1051,7 @@ def register():
     return render_template_string(AUTH_HTML, title="Registrazione", button="Crea account")
 
 @app.route("/login", methods=["GET", "POST"])
+@app.route("/accedi", methods=["GET", "POST"])  # Route italiana alternativa
 def login():
     if request.method == "POST":
         try:
@@ -973,7 +1083,7 @@ def login():
             flash(f"Errore: {str(e)}")
             return redirect(url_for("login"))
 
-    return render_template_string(AUTH_HTML, title="Login", button="Accedi")
+    return render_template_string(AUTH_HTML, title="Accedi", button="Entra")
 
 @app.route("/logout")
 def logout():
