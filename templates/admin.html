@@ -3,8 +3,8 @@
 <h2>Admin Panel</h2>
 
 <h3>Users</h3>
-<table style="width:100%;border-collapse:collapse;background:#061026;padding:8px">
-  <tr><th>Username</th><th>Premium</th><th>Admin</th><th>Created</th><th>Actions</th></tr>
+<table style="width:100%;border-collapse:collapse">
+  <tr><th>Username</th><th>Premium</th><th>Is Admin</th><th>Created</th><th>Actions</th></tr>
   {% for u in users %}
   <tr>
     <td>{{ u.username }}</td>
@@ -13,26 +13,21 @@
     <td>{{ u.created_at }}</td>
     <td>
       {% if not u.premium %}
-        <form method="POST" action="/admin/make_premium" style="display:inline;"><input type="hidden" name="username" value="{{ u.username }}"><button>Make Premium</button></form>
+      <form method="post" action="{{ url_for('make_premium') }}" style="display:inline">
+        <input type="hidden" name="username" value="{{ u.username }}">
+        <button type="submit">Make Premium</button>
+      </form>
       {% else %}
-        <form method="POST" action="/admin/remove_premium" style="display:inline;"><input type="hidden" name="username" value="{{ u.username }}"><button>Remove Premium</button></form>
+      <form method="post" action="{{ url_for('remove_premium') }}" style="display:inline">
+        <input type="hidden" name="username" value="{{ u.username }}">
+        <button type="submit">Remove Premium</button>
+      </form>
       {% endif %}
-      <form method="post" action="{{ url_for('admin_delete_user', username=u.username) }}" style="display:inline;"><button>Delete</button></form>
+      <form method="post" action="{{ url_for('admin_delete_user', username=u.username) }}" style="display:inline">
+        <button type="submit">Delete</button>
+      </form>
     </td>
   </tr>
   {% endfor %}
 </table>
-
-<h3 style="margin-top:16px;">Generate Codes</h3>
-<form method="post" action="/admin/generate_codes">
-  <input name="n" type="number" value="3" min="1" max="200"><button>Generate</button>
-</form>
-
-<h3 style="margin-top:16px;">Create User</h3>
-<form method="post" action="/admin/create_user">
-  <input name="username" placeholder="username" required>
-  <input name="password" placeholder="password" required>
-  <label><input type="checkbox" name="is_admin"> is admin</label>
-  <button>Create</button>
-</form>
 {% endblock %}
