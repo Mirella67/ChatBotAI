@@ -80,7 +80,7 @@ USED_LICENSES = set(DB.get("used_licenses", []))
 # ============================================
 # AI FUNCTIONS
 # ============================================
-def call_groq(messages, model="llama-3.1-70b-versatile"):
+def call_groq(messages, model="llama-3.1-8b-instant"):
     if not groq_client:
         return "⚠️ Groq non configurato. Aggiungi la tua API key."
     
@@ -1267,7 +1267,7 @@ Rispondi sempre in italiano in modo naturale e utile."""
                 }
             ]
             
-            model = "llama-3.3-70b-versatile" if user.get("premium") else "llama-3.1-70b-versatile"
+            model = "llama-3.3-70b-versatile" if user.get("premium") else "llama-3.1-8b-instant"
             response = call_groq(messages, model)
             
             return jsonify({
