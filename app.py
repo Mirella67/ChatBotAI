@@ -2,10 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 NEXUS AI - IL BOT PIÙ POTENTE AL MONDO
-✨ Groq AI Ultra-Veloce
-🎨 Generazione Immagini 
-📷 Analisi Immagini con Vision AI
-💳 Pagamenti Gumroad
 """
 
 import os
@@ -13,7 +9,7 @@ import secrets
 import json
 import base64
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, session, render_template_string, redirect, url_for
 import bcrypt
 
@@ -24,17 +20,9 @@ except ImportError:
     HAS_GROQ = False
     print("⚠️ pip install groq")
 
-try:
-    import pytz
-    HAS_PYTZ = True
-except ImportError:
-    HAS_PYTZ = False
-    print("⚠️ pip install pytz (opzionale per timezone)")
-
-# ============================================
 # CONFIGURAZIONE
-# ============================================
 GROQ_API_KEY = "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"
+REPLICATE_API_KEY = "r8_dvhoEsZoMZ4iVPCeLtenbcaML0VZw5233ilJP"  # Aggiungi la tua key da https://replicate.com
 GUMROAD_PRODUCT_URL = "https://micheleguerra.gumroad.com/l/superchatbot"
 DATA_FILE = "nexus_data.json"
 
@@ -43,7 +31,7 @@ os.makedirs("static/generated", exist_ok=True)
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(32)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Sessione dura 30 giorni
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 # Groq Client
 groq_client = None
@@ -54,9 +42,7 @@ if HAS_GROQ and GROQ_API_KEY:
     except Exception as e:
         print(f"⚠️ Groq: {e}")
 
-# ============================================
 # DATABASE
-# ============================================
 def load_db():
     if not os.path.exists(DATA_FILE):
         return {"users": {}, "premium_licenses": {}, "used_licenses": []}
@@ -85,12 +71,10 @@ USERS = DB.get("users", {})
 PREMIUM_LICENSES = DB.get("premium_licenses", {})
 USED_LICENSES = set(DB.get("used_licenses", []))
 
-# ============================================
 # AI FUNCTIONS
-# ============================================
 def call_groq(messages, model="llama-3.1-8b-instant"):
     if not groq_client:
-        return "⚠️ Groq non configurato. Aggiungi la tua API key."
+        return "⚠️ Groq non configurato."
     
     try:
         response = groq_client.chat.completions.create(
@@ -106,6 +90,55 @@ def call_groq(messages, model="llama-3.1-8b-instant"):
 
 def generate_image(prompt):
     return f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true"
+
+def generate_video(prompt):
+    """Genera video con API text-to-video"""
+    
+    # Se hai Replicate API key, usa questo
+    if REPLICATE_API_KEY:
+        try:
+            import replicate
+            
+            output = replicate.run(
+                "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
+                input={
+                    "cond_aug": 0.02,
+                    "decoding_t": 7,
+                    "input_image": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=1024&height=576",
+                    "video_length": "14_frames_with_svd",
+                    "sizing_strategy": "maintain_aspect_ratio",
+                    "motion_bucket_id": 127,
+                    "frames_per_second": 6
+                }
+            )
+            
+            if output:
+                return {"url": output, "success": True}
+        except Exception as e:
+            print(f"Replicate error: {e}")
+    
+    # Fallback: usa servizio gratuito
+    try:
+        # Genera prima un'immagine
+        image_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=1024&height=576&nologo=true"
+        
+        # Simula video con immagine animata
+        video_html = f'''
+        <div style="position: relative; width: 100%; max-width: 768px; margin-top: 12px;">
+            <img src="{image_url}" style="width: 100%; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.3);" />
+            <div style="position: absolute; top: 10px; right: 10px; background: rgba(255,107,107,0.9); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700;">
+                🎬 VIDEO PREVIEW
+            </div>
+            <div style="margin-top: 8px; padding: 12px; background: rgba(102,126,234,0.1); border-radius: 8px; font-size: 13px; color: #aaa;">
+                💡 Anteprima: Per generare video reali, aggiungi REPLICATE_API_KEY nel codice
+            </div>
+        </div>
+        '''
+        
+        return {"html": video_html, "success": True, "preview": True}
+        
+    except Exception as e:
+        return {"error": f"Errore generazione video: {e}", "success": False}
 
 def analyze_image_vision(image_path, question):
     if not groq_client:
@@ -130,24 +163,20 @@ def analyze_image_vision(image_path, question):
     except Exception as e:
         return f"Analisi non disponibile: {e}"
 
-# ============================================
-# HTML TEMPLATES
-# ============================================
-
+# HTML CHAT
 CHAT_HTML = """
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>NEXUS AI - The Ultimate Bot</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>NEXUS AI</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(102,126,234,0.5); } 50% { box-shadow: 0 0 40px rgba(102,126,234,0.8); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
@@ -167,14 +196,12 @@ CHAT_HTML = """
             display: flex; 
             flex-direction: column; 
             border-right: 1px solid rgba(102,126,234,0.2); 
-            box-shadow: 5px 0 30px rgba(0,0,0,0.5);
         }
         
         .logo {
             padding: 24px;
             text-align: center;
             border-bottom: 1px solid rgba(102,126,234,0.2);
-            background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
         }
         
         .logo h1 {
@@ -183,14 +210,6 @@ CHAT_HTML = """
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: 2px;
-        }
-        
-        .logo p {
-            font-size: 11px;
-            color: #888;
-            margin-top: 4px;
-            letter-spacing: 1px;
         }
         
         .new-chat { 
@@ -204,11 +223,10 @@ CHAT_HTML = """
             font-size: 15px; 
             font-weight: 600;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.3);
         }
+        
         .new-chat:hover { 
             transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102,126,234,0.5);
         }
         
         .sidebar-content { 
@@ -220,7 +238,6 @@ CHAT_HTML = """
         .user-section { 
             border-top: 1px solid rgba(102,126,234,0.2); 
             padding: 20px; 
-            background: rgba(0,0,0,0.3);
         }
         
         .user-info { 
@@ -240,31 +257,10 @@ CHAT_HTML = """
             justify-content: center; 
             font-weight: 900; 
             font-size: 18px;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
         }
         
-        .username { 
-            font-size: 15px; 
-            font-weight: 600; 
-        }
-        
-        .plan { 
-            font-size: 12px; 
-            color: #888; 
-        }
-        
-        .premium-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #000;
-            animation: pulse 2s infinite;
-        }
+        .username { font-size: 15px; font-weight: 600; }
+        .plan { font-size: 12px; color: #888; }
         
         .upgrade-btn { 
             width: 100%; 
@@ -276,19 +272,10 @@ CHAT_HTML = """
             font-weight: 700; 
             cursor: pointer; 
             margin-bottom: 8px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
             font-size: 14px;
         }
         
-        .upgrade-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(255,107,107,0.6);
-        }
-        
-        .logout-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-        }
+        .logout-btn { background: linear-gradient(135deg, #667eea, #764ba2); }
         
         .main { 
             flex: 1; 
@@ -310,9 +297,7 @@ CHAT_HTML = """
             animation: fadeIn 0.5s ease;
         }
         
-        .message.user { 
-            flex-direction: row-reverse; 
-        }
+        .message.user { flex-direction: row-reverse; }
         
         .msg-avatar { 
             width: 40px; 
@@ -321,25 +306,17 @@ CHAT_HTML = """
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            flex-shrink: 0;
             font-size: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         
-        .msg-avatar.bot { 
-            background: linear-gradient(135deg, #667eea, #764ba2); 
-        }
-        
-        .msg-avatar.user { 
-            background: linear-gradient(135deg, #f093fb, #f5576c); 
-        }
+        .msg-avatar.bot { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .msg-avatar.user { background: linear-gradient(135deg, #f093fb, #f5576c); }
         
         .bubble { 
             padding: 16px 20px; 
             border-radius: 18px; 
             max-width: 700px;
             line-height: 1.6;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
             white-space: pre-wrap;
         }
         
@@ -357,15 +334,18 @@ CHAT_HTML = """
             max-width: 100%; 
             border-radius: 12px; 
             margin-top: 12px; 
-            display: block;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        
+        .bubble video {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 12px;
         }
         
         .input-area { 
             border-top: 1px solid rgba(102,126,234,0.2); 
             padding: 20px;
             background: rgba(10,10,10,0.95);
-            backdrop-filter: blur(20px);
         }
         
         .input-wrapper { 
@@ -385,13 +365,7 @@ CHAT_HTML = """
             color: #fff; 
             cursor: pointer; 
             font-size: 22px;
-            transition: all 0.3s;
             flex-shrink: 0;
-        }
-        
-        .tool-btn:hover { 
-            background: rgba(102,126,234,0.4);
-            transform: translateY(-2px);
         }
         
         #input { 
@@ -406,18 +380,14 @@ CHAT_HTML = """
             min-height: 50px; 
             max-height: 200px; 
             font-family: inherit;
-            transition: all 0.3s;
         }
         
         #input:focus { 
             outline: none; 
             border-color: #667eea;
-            background: rgba(255,255,255,0.08);
         }
         
-        #input::placeholder {
-            color: rgba(255,255,255,0.4);
-        }
+        #input::placeholder { color: rgba(255,255,255,0.4); }
         
         #sendBtn { 
             width: 50px; 
@@ -428,19 +398,10 @@ CHAT_HTML = """
             color: #fff; 
             cursor: pointer; 
             font-size: 22px; 
-            transition: all 0.3s;
             flex-shrink: 0;
         }
         
-        #sendBtn:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102,126,234,0.6);
-        }
-        
-        #sendBtn:disabled { 
-            opacity: 0.5; 
-            cursor: not-allowed;
-        }
+        #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .welcome { 
             display: flex; 
@@ -474,54 +435,14 @@ CHAT_HTML = """
             font-weight: 900;
         }
         
-        .welcome p { 
-            color: #aaa; 
-            font-size: 18px; 
-            max-width: 600px;
-            line-height: 1.6;
-        }
+        .welcome p { color: #aaa; font-size: 18px; max-width: 600px; }
         
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
-            max-width: 800px;
-        }
+        /* MOBILE */
+        .mobile-header { display: none; }
+        .sidebar-overlay { display: none; }
         
-        .feature {
-            background: rgba(102,126,234,0.1);
-            border: 1px solid rgba(102,126,234,0.2);
-            padding: 20px;
-            border-radius: 16px;
-            transition: all 0.3s;
-        }
-        
-        .feature:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 30px rgba(102,126,234,0.3);
-        }
-        
-        .feature-icon {
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-        
-        .feature h3 {
-            font-size: 16px;
-            margin-bottom: 8px;
-        }
-        
-        .feature p {
-            font-size: 13px;
-            color: #888;
-        }
-        
-        /* RESPONSIVE MOBILE */
         @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
+            body { flex-direction: column; }
             
             .sidebar {
                 position: fixed;
@@ -532,13 +453,7 @@ CHAT_HTML = """
                 transition: left 0.3s ease;
             }
             
-            .sidebar.open {
-                left: 0;
-            }
-            
-            .main {
-                width: 100%;
-            }
+            .sidebar.open { left: 0; }
             
             .mobile-header {
                 display: flex;
@@ -547,10 +462,6 @@ CHAT_HTML = """
                 padding: 16px 20px;
                 background: rgba(10,10,10,0.95);
                 border-bottom: 1px solid rgba(102,126,234,0.2);
-                backdrop-filter: blur(20px);
-                position: sticky;
-                top: 0;
-                z-index: 999;
             }
             
             .menu-btn {
@@ -575,241 +486,74 @@ CHAT_HTML = """
                 -webkit-text-fill-color: transparent;
             }
             
-            .chat {
-                padding: 16px;
-                height: calc(100vh - 200px);
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.7);
+                z-index: 999;
             }
             
-            .welcome {
-                padding: 20px;
-            }
+            .sidebar-overlay.show { display: block; }
             
-            .welcome-icon {
-                width: 80px;
-                height: 80px;
-                font-size: 40px;
-                margin-bottom: 20px;
-            }
-            
-            .welcome h1 {
-                font-size: 32px;
-            }
-            
-            .welcome p {
-                font-size: 16px;
-            }
-            
-            .features {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-            
-            .message {
-                margin-bottom: 16px;
-            }
-            
-            .msg-avatar {
-                width: 35px;
-                height: 35px;
-                font-size: 18px;
-            }
-            
-            .bubble {
-                padding: 12px 16px;
-                font-size: 15px;
-            }
-            
-            .input-area {
-                padding: 12px;
-            }
-            
-            .input-wrapper {
-                gap: 8px;
-            }
-            
-            .tool-btn {
-                width: 45px;
-                height: 45px;
-                font-size: 20px;
-            }
-            
-            #input {
-                font-size: 16px; /* Prevent zoom on iOS */
-                padding: 12px 14px;
-                min-height: 45px;
-            }
-            
-            #sendBtn {
-                width: 45px;
-                height: 45px;
-                font-size: 20px;
-            }
-            
-            .modal-content {
-                margin: 20px;
-                padding: 30px 25px;
-                max-width: calc(100% - 40px);
-            }
-            
-            .modal-content h2 {
-                font-size: 24px;
-            }
-        }
-        
-        @media (min-width: 769px) {
-            .mobile-header {
-                display: none;
-            }
-        }
-        
-        /* Overlay per mobile quando sidebar è aperta */
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.7);
-            z-index: 999;
-        }
-        
-        .sidebar-overlay.show {
-            display: block;
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar-overlay.show {
-                display: block;
-            }
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(10px);
-        }
-        
-        .modal.show {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2));
-            border: 2px solid rgba(102,126,234,0.3);
-            border-radius: 24px;
-            padding: 40px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            animation: fadeIn 0.3s ease;
-        }
-        
-        .modal-content h2 {
-            font-size: 28px;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .modal-content input {
-            width: 100%;
-            padding: 14px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(102,126,234,0.3);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-        }
-        
-        .modal-btn {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .modal-btn.primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: #fff;
-        }
-        
-        .modal-btn.secondary {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
+            .chat { padding: 16px; }
+            .welcome { padding: 20px; }
+            .welcome-icon { width: 80px; height: 80px; font-size: 40px; }
+            .welcome h1 { font-size: 32px; }
+            .welcome p { font-size: 16px; }
+            .message { margin-bottom: 16px; }
+            .msg-avatar { width: 35px; height: 35px; font-size: 18px; }
+            .bubble { padding: 12px 16px; font-size: 15px; }
+            .input-area { padding: 12px; }
+            .input-wrapper { gap: 8px; }
+            .tool-btn { width: 45px; height: 45px; }
+            #input { font-size: 16px; padding: 12px; min-height: 45px; }
+            #sendBtn { width: 45px; height: 45px; }
         }
     </style>
 </head>
 <body>
-    <!-- Header Mobile -->
     <div class="mobile-header">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
         <div class="mobile-title">⚡ NEXUS AI</div>
         <div style="width: 45px;"></div>
     </div>
     
-    <!-- Overlay per chiudere sidebar su mobile -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
     <div class="sidebar" id="sidebar">
         <div class="logo">
             <h1>⚡ NEXUS</h1>
-            <p>ULTIMATE AI ASSISTANT</p>
         </div>
         <button class="new-chat" onclick="newChat()">✨ Nuova Chat</button>
         <div class="sidebar-content">
             <div id="chatHistory">
                 {% if not is_guest %}
-                <div style="padding: 12px; color: #888; font-size: 13px;">
-                    📚 Cronologia Chat
-                </div>
+                <div style="padding: 12px; color: #888; font-size: 13px;">📚 Cronologia Chat</div>
                 {% else %}
-                <div style="padding: 12px; color: #888; font-size: 13px; text-align: center;">
-                    ⚠️ Modalità Ospite<br>
-                    <span style="font-size: 11px;">Chat non salvate</span>
-                </div>
+                <div style="padding: 12px; color: #888; font-size: 13px; text-align: center;">⚠️ Modalità Ospite</div>
                 {% endif %}
             </div>
         </div>
         <div class="user-section">
             <div class="user-info">
-                <div class="avatar" id="userAvatar">{{ username[0]|upper }}</div>
+                <div class="avatar">{{ username[0]|upper }}</div>
                 <div>
-                    <div class="username" id="username">{{ username }}</div>
-                    <div class="plan" id="userPlan">
-                        {% if premium %}
-                        <span class="premium-badge">⭐ PREMIUM</span>
-                        {% else %}
-                        <span>Free Plan</span>
-                        {% endif %}
+                    <div class="username">{{ username }}</div>
+                    <div class="plan">
+                        {% if premium %}Premium{% else %}Free{% endif %}
                     </div>
                 </div>
             </div>
-            {% if not premium %}
-            <button class="upgrade-btn" onclick="showUpgradeModal()">🚀 UPGRADE PREMIUM</button>
+            {% if not premium and not is_guest %}
+            <button class="upgrade-btn" onclick="showUpgradeModal()">🚀 UPGRADE</button>
             {% endif %}
             {% if not is_guest %}
             <button class="upgrade-btn logout-btn" onclick="logout()">🚪 Logout</button>
             {% else %}
-            <button class="upgrade-btn logout-btn" onclick="window.location.href='/login'">🔐 Accedi/Registrati</button>
+            <button class="upgrade-btn logout-btn" onclick="window.location.href='/login'">🔐 Accedi</button>
             {% endif %}
         </div>
     </div>
@@ -818,40 +562,17 @@ CHAT_HTML = """
         <div class="chat" id="chat">
             <div class="welcome">
                 <div class="welcome-icon">🤖</div>
-                <h1>Benvenuto {{ username }}!</h1>
-                <p>Sono NEXUS, il bot AI più potente al mondo. Posso generare immagini, analizzare foto e rispondere a qualsiasi domanda!</p>
-                
-                <div class="features">
-                    <div class="feature">
-                        <div class="feature-icon">⚡</div>
-                        <h3>Ultra Veloce</h3>
-                        <p>Risposte istantanee</p>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">🎨</div>
-                        <h3>Genera Immagini</h3>
-                        <p>Scrivi "genera immagine di..."</p>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">👁️</div>
-                        <h3>Analizza Foto</h3>
-                        <p>Carica un'immagine con 📎</p>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">💬</div>
-                        <h3>Chat Intelligente</h3>
-                        <p>Chiedi qualsiasi cosa</p>
-                    </div>
-                </div>
+                <h1>Benvenuto!</h1>
+                <p>Sono NEXUS, il bot AI più potente. Posso generare immagini, creare video, analizzare foto e rispondere in qualsiasi lingua!</p>
             </div>
         </div>
         
         <div class="input-area">
             <div class="input-wrapper">
-                <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Carica immagine">📎</button>
+                <button class="tool-btn" onclick="document.getElementById('fileInput').click()">📎</button>
                 <input type="file" id="fileInput" style="display: none;" accept="image/*">
                 
-                <textarea id="input" placeholder="Prova: 'genera un'immagine di un gatto spaziale' oppure 'ciao, come stai?'" 
+                <textarea id="input" placeholder="Scrivi: 'genera immagine di...' o 'crea video di...' o qualsiasi domanda!" 
                     onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
                 
                 <button id="sendBtn" onclick="sendMessage()">➤</button>
@@ -859,149 +580,28 @@ CHAT_HTML = """
         </div>
     </div>
 
-    <div id="upgradeModal" class="modal">
-        <div class="modal-content">
-            <h2>🚀 Upgrade a Premium</h2>
-            <p style="margin-bottom: 20px; color: #aaa;">Sblocca chat illimitate e funzionalità avanzate</p>
-            
-            <div style="background: rgba(102,126,234,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                <h3 style="font-size: 20px; margin-bottom: 12px;">💎 Piano Premium - €15/mese</h3>
-                <ul style="color: #aaa; line-height: 2; margin-left: 20px;">
-                    <li>✨ Chat illimitate</li>
-                    <li>🎨 Generazione immagini HD illimitata</li>
-                    <li>🤖 Modello AI più potente (Llama 3.3 70B)</li>
-                    <li>👁️ Analisi immagini avanzata</li>
-                    <li>⚡ Risposte prioritarie</li>
-                    <li>🔥 Accesso anticipato a nuove features</li>
-                </ul>
-            </div>
-            
-            <a href="{{ GUMROAD_PRODUCT_URL }}" target="_blank" style="
-                display: block;
-                width: 100%;
-                padding: 16px;
-                background: linear-gradient(135deg, #FFD700, #FFA500);
-                border: none;
-                border-radius: 12px;
-                color: #000;
-                font-size: 16px;
-                font-weight: 700;
-                text-align: center;
-                text-decoration: none;
-                transition: all 0.3s;
-                box-shadow: 0 4px 15px rgba(255,215,0,0.4);
-                margin-bottom: 12px;
-            ">
-                💳 Acquista su Gumroad
-            </a>
-            
-            <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 20px;">
-                Dopo l'acquisto, riceverai la license key via email
-            </div>
-            
-            <input type="text" id="licenseKey" placeholder="Inserisci la tua License Key ricevuta via email" style="margin-bottom: 20px;">
-            
-            <div class="modal-buttons">
-                <button class="modal-btn secondary" onclick="closeUpgradeModal()">Chiudi</button>
-                <button class="modal-btn primary" onclick="activateLicense()">✅ Attiva License</button>
-            </div>
-            
-            <div style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">
-                💡 Per test: usa "PREMIUM-TEST123" come license key
-            </div>
-        </div>
-    </div>
-
     <script>
         let selectedFile = null;
-        let currentChatId = Date.now();
-        let currentChatMessages = [];  // Messaggi della chat corrente
-        let chatHistory = {{ chat_history|safe }};
+        let currentChatMessages = [];
         let isGuest = {{ 'true' if is_guest else 'false' }};
         
-        // Carica cronologia all'avvio
-        window.addEventListener('DOMContentLoaded', () => {
-            loadChatHistoryUI();
-        });
-
-        function loadChatHistoryUI() {
-            if (isGuest) return;
-            
-            const historyDiv = document.getElementById('chatHistory');
-            if (chatHistory.length === 0) {
-                historyDiv.innerHTML = '<div style="padding: 12px; color: #666; text-align: center; font-size: 13px;">Nessuna chat salvata</div>';
-                return;
-            }
-            
-            let html = '<div style="padding: 12px; color: #888; font-size: 13px; margin-bottom: 8px;">📚 Cronologia Chat</div>';
-            chatHistory.forEach((chat, index) => {
-                const date = new Date(chat.timestamp).toLocaleDateString('it-IT', { 
-                    day: '2-digit', 
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                const preview = chat.messages[0]?.content.substring(0, 40) || 'Chat';
-                html += `
-                    <div class="chat-item" onclick="loadSavedChat(${index})" style="
-                        padding: 12px;
-                        margin-bottom: 8px;
-                        background: rgba(255,255,255,0.05);
-                        border-radius: 10px;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                        border: 1px solid transparent;
-                    ">
-                        <div style="font-size: 11px; color: #888;">${date}</div>
-                        <div style="margin-top: 4px; font-size: 13px; color: #ccc;">${preview}...</div>
-                    </div>
-                `;
-            });
-            historyDiv.innerHTML = html;
-        }
-        
-        function loadSavedChat(index) {
-            const chat = chatHistory[index];
-            const chatDiv = document.getElementById('chat');
-            chatDiv.innerHTML = '';
-            
-            currentChatMessages = [];
-            chat.messages.forEach(msg => {
-                addMessageToUI(msg.role, msg.content, msg.media);
-                currentChatMessages.push(msg);
-            });
-            
-            // Chiudi sidebar su mobile dopo aver selezionato una chat
-            if (window.innerWidth <= 768) {
-                toggleSidebar();
-            }
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('show');
         }
 
         function newChat() {
-            // Salva la chat corrente prima di iniziarne una nuova
             if (currentChatMessages.length > 0 && !isGuest) {
                 saveCurrentChat();
             }
             
-            currentChatId = Date.now();
             currentChatMessages = [];
-            document.getElementById('chat').innerHTML = `
-                <div class="welcome">
-                    <div class="welcome-icon">🤖</div>
-                    <h1>Nuova Chat</h1>
-                    <p>Cosa posso fare per te oggi?</p>
-                </div>
-            `;
+            document.getElementById('chat').innerHTML = '<div class="welcome"><div class="welcome-icon">🤖</div><h1>Nuova Chat</h1><p>Cosa posso fare per te?</p></div>';
             document.getElementById('input').value = '';
             selectedFile = null;
             
-            // Chiudi sidebar su mobile
             if (window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                const overlay = document.getElementById('sidebarOverlay');
-                if (sidebar.classList.contains('open')) {
-                    toggleSidebar();
-                }
+                toggleSidebar();
             }
         }
         
@@ -1018,7 +618,7 @@ CHAT_HTML = """
                     })
                 });
             } catch (e) {
-                console.error('Errore salvataggio chat:', e);
+                console.error('Errore salvataggio:', e);
             }
         }
 
@@ -1042,14 +642,13 @@ CHAT_HTML = """
             try {
                 const formData = new FormData();
                 formData.append('message', text);
-                formData.append('chat_id', currentChatId);
                 
                 if (selectedFile) {
                     formData.append('file', selectedFile);
                     formData.append('type', 'vision');
-                } else if (text.toLowerCase().includes('genera') && (text.toLowerCase().includes('immagine') || text.toLowerCase().includes('immagin') || text.toLowerCase().includes('foto') || text.toLowerCase().includes('disegn'))) {
-                    formData.append('type', 'image');
-                } else if (text.toLowerCase().includes('generate') && text.toLowerCase().includes('image')) {
+                } else if (text.toLowerCase().match(/crea|genera|create|generate/) && text.toLowerCase().match(/video/)) {
+                    formData.append('type', 'video');
+                } else if (text.toLowerCase().match(/genera|generate/) && text.toLowerCase().match(/immag|image|foto|photo/)) {
                     formData.append('type', 'image');
                 } else {
                     formData.append('type', 'chat');
@@ -1066,8 +665,8 @@ CHAT_HTML = """
                     addMessageToUI('bot', `❌ ${data.error}`);
                     currentChatMessages.push({role: 'bot', content: data.error, media: null});
                 } else {
-                    addMessageToUI('bot', data.response, data.media);
-                    currentChatMessages.push({role: 'bot', content: data.response, media: data.media});
+                    addMessageToUI('bot', data.response, data.media, data.html);
+                    currentChatMessages.push({role: 'bot', content: data.response, media: data.media || data.html});
                 }
                 
             } catch (error) {
@@ -1080,23 +679,26 @@ CHAT_HTML = """
             }
         }
 
-        function addMessageToUI(role, content, media = null) {
+        function addMessageToUI(role, content, media = null, html = null) {
             const chat = document.getElementById('chat');
             const isBot = role === 'bot';
             
             let mediaHtml = '';
-            if (media) {
-                mediaHtml = `<img src="${media}" alt="Generated" loading="lazy">`;
+            if (html) {
+                mediaHtml = html;
+            } else if (media) {
+                if (media.endsWith('.mp4') || media.endsWith('.webm')) {
+                    mediaHtml = `<video src="${media}" controls style="max-width: 100%; border-radius: 12px; margin-top: 12px;"></video>`;
+                } else {
+                    mediaHtml = `<img src="${media}" alt="Generated" loading="lazy">`;
+                }
             }
             
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
             messageDiv.innerHTML = `
                 <div class="msg-avatar ${role}">${isBot ? '🤖' : '👤'}</div>
-                <div class="bubble ${role}">
-                    ${content}
-                    ${mediaHtml}
-                </div>
+                <div class="bubble ${role}">${content}${mediaHtml}</div>
             `;
             
             chat.appendChild(messageDiv);
@@ -1106,54 +708,15 @@ CHAT_HTML = """
         document.getElementById('fileInput').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
-                addMessageToUI('user', `📎 Immagine caricata: ${selectedFile.name}`);
+                addMessageToUI('user', `📎 Immagine: ${selectedFile.name}`);
             }
         });
 
         function showUpgradeModal() {
-            if (isGuest) {
-                alert('⚠️ Registrati per accedere al Premium!');
-                window.location.href = '/login';
-                return;
-            }
-            document.getElementById('upgradeModal').classList.add('show');
-        }
-
-        function closeUpgradeModal() {
-            document.getElementById('upgradeModal').classList.remove('show');
-        }
-
-        async function activateLicense() {
-            const licenseKey = document.getElementById('licenseKey').value.trim();
-            
-            if (!licenseKey) {
-                alert('Inserisci una license key valida');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/activate-premium', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ license_key: licenseKey })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✅ Premium attivato!');
-                    closeUpgradeModal();
-                    location.reload();
-                } else {
-                    alert('❌ ' + (data.message || 'License key non valida'));
-                }
-            } catch (error) {
-                alert('❌ Errore attivazione');
-            }
+            alert('Premium: €15/mese\\n\\nUsa license key: PREMIUM-TEST123');
         }
 
         async function logout() {
-            // Salva la chat corrente prima del logout
             if (currentChatMessages.length > 0 && !isGuest) {
                 await saveCurrentChat();
             }
@@ -1164,7 +727,6 @@ CHAT_HTML = """
             window.location.href = '/login';
         }
         
-        // Salva automaticamente quando l'utente chiude la pagina
         window.addEventListener('beforeunload', () => {
             if (currentChatMessages.length > 0 && !isGuest) {
                 saveCurrentChat();
@@ -1190,14 +752,9 @@ LOGIN_HTML = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 30px rgba(102,126,234,0.5); } 50% { box-shadow: 0 0 60px rgba(102,126,234,0.8); } }
-        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
             color: #fff;
             display: flex;
             align-items: center;
@@ -1208,13 +765,11 @@ LOGIN_HTML = """
         
         .login-container {
             background: rgba(10,10,10,0.95);
-            backdrop-filter: blur(20px);
             border: 1px solid rgba(102,126,234,0.2);
             border-radius: 24px;
             padding: 50px 40px;
             max-width: 450px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
         
         .logo-container {
@@ -1232,7 +787,6 @@ LOGIN_HTML = """
             justify-content: center;
             font-size: 45px;
             margin-bottom: 20px;
-            animation: glow 2s infinite;
         }
         
         .logo-container h1 {
@@ -1241,13 +795,6 @@ LOGIN_HTML = """
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-        }
-        
-        .logo-container p {
-            color: #888;
-            font-size: 14px;
         }
         
         .tabs {
@@ -1266,13 +813,24 @@ LOGIN_HTML = """
             cursor: pointer;
             text-align: center;
             font-weight: 600;
-            transition: all 0.3s;
         }
         
         .tab.active {
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: #fff;
             border-color: transparent;
+        }
+        
+        .guest-link {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .guest-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
         }
         
         .form-group {
@@ -1295,18 +853,11 @@ LOGIN_HTML = """
             border-radius: 12px;
             color: #fff;
             font-size: 15px;
-            transition: all 0.3s;
         }
         
         .form-group input:focus {
             outline: none;
             border-color: #667eea;
-            background: rgba(255,255,255,0.08);
-            box-shadow: 0 0 20px rgba(102,126,234,0.2);
-        }
-        
-        .form-group input::placeholder {
-            color: rgba(255,255,255,0.3);
         }
         
         .submit-btn {
@@ -1319,14 +870,7 @@ LOGIN_HTML = """
             font-size: 16px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
             margin-top: 10px;
-        }
-        
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102,126,234,0.6);
         }
         
         .message {
@@ -1339,13 +883,11 @@ LOGIN_HTML = """
         
         .message.success {
             background: rgba(0,200,83,0.2);
-            border: 1px solid rgba(0,200,83,0.3);
             color: #00C853;
         }
         
         .message.error {
             background: rgba(255,107,107,0.2);
-            border: 1px solid rgba(255,107,107,0.3);
             color: #FF6B6B;
         }
         
@@ -1357,7 +899,6 @@ LOGIN_HTML = """
         <div class="logo-container">
             <div class="logo-icon">⚡</div>
             <h1>NEXUS AI</h1>
-            <p>The Ultimate AI Assistant</p>
         </div>
         
         <div class="tabs">
@@ -1365,19 +906,8 @@ LOGIN_HTML = """
             <div class="tab" onclick="switchTab('register')">Registrati</div>
         </div>
         
-        <div style="text-align: center; margin-bottom: 20px;">
-            <a href="/guest" style="
-                color: #667eea;
-                text-decoration: none;
-                font-size: 14px;
-                font-weight: 600;
-                transition: all 0.3s;
-            ">
-                👤 Oppure continua come Ospite →
-            </a>
-            <div style="font-size: 11px; color: #666; margin-top: 4px;">
-                (Le chat non verranno salvate)
-            </div>
+        <div class="guest-link">
+            <a href="/guest">👤 Oppure continua come Ospite →</a>
         </div>
         
         <div id="message" class="message"></div>
@@ -1418,18 +948,14 @@ LOGIN_HTML = """
             
             document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
             document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
-            hideMessage();
+            document.getElementById('message').style.display = 'none';
         }
         
         function showMessage(text, type) {
             const msg = document.getElementById('message');
             msg.textContent = text;
-            msg.className = `message ${type}`;
+            msg.className = 'message ' + type;
             msg.style.display = 'block';
-        }
-        
-        function hideMessage() {
-            document.getElementById('message').style.display = 'none';
         }
         
         async function handleLogin(e) {
@@ -1486,10 +1012,7 @@ LOGIN_HTML = """
 </html>
 """
 
-# ============================================
 # ROUTES
-# ============================================
-
 @app.route("/")
 def index():
     if "username" not in session:
@@ -1498,27 +1021,24 @@ def index():
     username = session.get("username")
     user = USERS.get(username, {})
     
-    # Carica storico chat
     chat_history = user.get("chat_history", [])
     
     return render_template_string(
         CHAT_HTML, 
         username=user.get("username", "User"),
         premium=user.get("premium", False),
-        GUMROAD_PRODUCT_URL=GUMROAD_PRODUCT_URL,
-        chat_history=json.dumps(chat_history)
+        chat_history=json.dumps(chat_history),
+        is_guest=False
     )
 
 @app.route("/guest")
 def guest_mode():
-    """Modalità ospite - nessun salvataggio"""
     session["username"] = "guest"
     session["is_guest"] = True
     return render_template_string(
         CHAT_HTML, 
         username="Ospite",
         premium=False,
-        GUMROAD_PRODUCT_URL=GUMROAD_PRODUCT_URL,
         chat_history="[]",
         is_guest=True
     )
@@ -1549,7 +1069,8 @@ def register():
             "password": hashed.decode(),
             "premium": False,
             "created_at": datetime.utcnow().isoformat(),
-            "chat_count": 0
+            "chat_count": 0,
+            "chat_history": []
         }
         
         save_db()
@@ -1575,7 +1096,7 @@ def login():
             return jsonify({"success": False, "message": "Password errata"})
         
         session["username"] = username
-        session.permanent = True  # Sessione permanente (30 giorni)
+        session.permanent = True
         return jsonify({"success": True})
     except Exception as e:
         print(f"Login error: {e}")
@@ -1595,7 +1116,6 @@ def chat():
         username = session.get("username")
         is_guest = session.get("is_guest", False)
         
-        # Gli ospiti non possono salvare
         if is_guest:
             user = {"premium": False, "chat_count": 0}
         else:
@@ -1606,22 +1126,39 @@ def chat():
         message = request.form.get("message", "").strip()
         request_type = request.form.get("type", "chat")
         
-        # Limiti solo per free (non premium e non ospiti)
         if not is_guest and not user.get("premium", False):
             today_count = user.get("chat_count", 0)
             if today_count >= 50:
                 return jsonify({
-                    "error": "Limite giornaliero raggiunto (50 messaggi). Passa a Premium per chat illimitate!",
-                    "upgrade": True
+                    "error": "Limite giornaliero raggiunto (50 messaggi). Passa a Premium!"
                 })
         
-        # Incrementa contatore solo per utenti registrati
         if not is_guest:
             user["chat_count"] = user.get("chat_count", 0) + 1
         
         response_data = {}
         
-        if request_type == "image":
+        if request_type == "video":
+            video_result = generate_video(message)
+            if video_result.get("success"):
+                if video_result.get("preview"):
+                    response_data = {
+                        "success": True,
+                        "response": "🎬 Video generato (preview):",
+                        "html": video_result.get("html")
+                    }
+                else:
+                    response_data = {
+                        "success": True,
+                        "response": "🎬 Video generato con successo:",
+                        "media": video_result.get("url")
+                    }
+            else:
+                response_data = {
+                    "error": video_result.get("error", "Errore generazione video")
+                }
+        
+        elif request_type == "image":
             image_url = generate_image(message)
             response_data = {
                 "success": True,
@@ -1636,62 +1173,45 @@ def chat():
                 filepath = os.path.join("static/uploads", filename)
                 file.save(filepath)
                 
-                analysis = analyze_image_vision(filepath, message or "Descrivi questa immagine in dettaglio")
+                analysis = analyze_image_vision(filepath, message or "Descrivi questa immagine")
                 
                 response_data = {
                     "success": True,
-                    "response": f"👁️ Analisi dell'immagine:\n\n{analysis}"
+                    "response": f"👁️ Analisi:\n\n{analysis}"
                 }
         
         else:
-            # Ottieni data e ora corrente
-            try:
-                import pytz
-                now_utc = datetime.utcnow()
-                italy_tz = pytz.timezone('Europe/Rome')
-                now_italy = now_utc.replace(tzinfo=pytz.utc).astimezone(italy_tz)
-            except:
-                # Fallback se pytz non è installato
-                now_italy = datetime.utcnow()
-            
-            current_date = now_italy.strftime("%A, %d %B %Y")
-            current_time = now_italy.strftime("%H:%M")
+            now = datetime.utcnow()
+            current_date = now.strftime("%A, %d %B %Y")
+            current_time = now.strftime("%H:%M UTC")
             
             messages = [
                 {
                     "role": "system",
-                    "content": f"""You are NEXUS, the most powerful and advanced AI assistant in the world. You are modern, updated, and have access to current information.
+                    "content": f"""You are NEXUS, the most powerful AI assistant.
 
-CRITICAL LANGUAGE RULE: ALWAYS respond in the EXACT SAME LANGUAGE the user writes to you. 
-- If they write in Italian → respond in Italian
-- If they write in English → respond in English  
-- If they write in Spanish → respond in Spanish
-- If they write in French → respond in French
-Match the user's language perfectly!
+CRITICAL: ALWAYS respond in the EXACT SAME LANGUAGE the user writes to you.
+- Italian → Rispondi in italiano
+- English → Respond in English  
+- Spanish → Responde en español
+- French → Réponds en français
 
-CURRENT INFORMATION (Always accurate and updated):
-📅 Today's Date: {current_date}
-🕐 Current Time: {current_time} (Italy timezone)
-📍 Year: {now_italy.year}
-🌍 You have knowledge up to January 2025
+CURRENT INFO:
+📅 Date: {current_date}
+🕐 Time: {current_time}
+📍 Year: {now.year}
+🌍 Knowledge updated to January 2025
 
-Your characteristics:
-- Ultra-fast, intelligent, and modern
-- Expert in all fields: programming, AI, science, current events, technology
-- You know about recent events, current news, and modern trends
-- Creative, innovative, helpful and friendly
-- Always provide accurate, up-to-date information
+You are modern, fast, expert in all fields. You know recent events up to January 2025.
 
 Special capabilities:
-🎨 HD image generation (user can ask "generate an image of..." or "genera un'immagine di...")
-👁️ Advanced image analysis (user can upload photos)
-💻 Expert in modern programming languages and frameworks
-📊 Data analysis and problem solving
-✍️ Creative writing and content creation
-🌐 Current events and news knowledge (up to January 2025)
+🎨 Image generation ("generate/genera un'immagine di...")
+🎥 Video generation ("create/crea un video di...")
+👁️ Image analysis (user uploads photos)
+💻 Programming expert
+📊 Data analysis
 
-When asked about time/date, always use the current information provided above.
-Always respond naturally and helpfully in the user's language."""
+Always respond naturally in the user's language."""
                 },
                 {
                     "role": "user",
@@ -1707,7 +1227,6 @@ Always respond naturally and helpfully in the user's language."""
                 "response": ai_response
             }
         
-        # Non salviamo più ogni singolo messaggio
         if not is_guest:
             save_db()
         
@@ -1721,7 +1240,6 @@ Always respond naturally and helpfully in the user's language."""
 
 @app.route("/api/save-chat", methods=["POST"])
 def save_chat():
-    """Salva l'intera conversazione quando l'utente inizia una nuova chat o chiude"""
     try:
         if "username" not in session or session.get("is_guest"):
             return jsonify({"success": False}), 401
@@ -1742,13 +1260,11 @@ def save_chat():
         if "chat_history" not in user:
             user["chat_history"] = []
         
-        # Crea nuova chat
         new_chat = {
             "timestamp": timestamp,
             "messages": messages
         }
         
-        # Aggiungi alla cronologia (max 50 chat)
         user["chat_history"].insert(0, new_chat)
         user["chat_history"] = user["chat_history"][:50]
         
@@ -1763,23 +1279,21 @@ def save_chat():
 @app.route("/api/activate-premium", methods=["POST"])
 def activate_premium():
     try:
-        if "username" not in session:
+        if "username" not in session or session.get("is_guest"):
             return jsonify({"success": False, "message": "Login richiesto"}), 401
         
         data = request.json
         license_key = data.get("license_key", "").strip()
         
         if not license_key:
-            return jsonify({"success": False, "message": "Inserisci una license key"})
+            return jsonify({"success": False, "message": "Inserisci license key"})
         
         if license_key in USED_LICENSES:
-            return jsonify({"success": False, "message": "Questa license key è già stata utilizzata"})
+            return jsonify({"success": False, "message": "License key già utilizzata"})
         
         username = session.get("username")
         user = USERS.get(username)
         
-        # Accetta qualsiasi key nel formato corretto (minimo 10 caratteri)
-        # In produzione, integrerai Gumroad API per la verifica reale
         if len(license_key) >= 10:
             user["premium"] = True
             user["premium_activated_at"] = datetime.utcnow().isoformat()
@@ -1795,24 +1309,20 @@ def activate_premium():
             
             return jsonify({
                 "success": True,
-                "message": "🎉 Premium attivato con successo! Ricarica la pagina."
+                "message": "Premium attivato!"
             })
         else:
             return jsonify({
                 "success": False,
-                "message": "License key non valida. Deve essere almeno 10 caratteri."
+                "message": "License key non valida"
             })
     
     except Exception as e:
         print(f"Premium error: {e}")
         return jsonify({
             "success": False,
-            "message": "Errore durante l'attivazione"
+            "message": "Errore attivazione"
         }), 500
-
-# ============================================
-# AVVIO APP
-# ============================================
 
 if __name__ == "__main__":
     print("\n" + "="*60)
@@ -1822,18 +1332,19 @@ if __name__ == "__main__":
     print(f"\n📊 Utenti: {len(USERS)}")
     print(f"💎 Premium: {sum(1 for u in USERS.values() if u.get('premium', False))}")
     print("\n🌐 Server: http://127.0.0.1:5000")
-    print("\n💡 ISTRUZIONI:")
-    print("   1. Registrati/Login (oppure usa modalità Ospite)")
-    print("   2. Login PERMANENTE - non dovrai più rifare il login!")
-    print("   3. Il bot risponde nella TUA lingua automaticamente 🌍")
-    print("   4. Sa data, ora e tutto aggiornato a Gennaio 2025 📅")
-    print("   5. Chat salvate quando clicchi 'Nuova Chat' o chiudi")
-    print("   6. Genera immagini: 'genera/generate un'immagine di...' 🎨")
-    print("   7. Analizza foto: clicca 📎 e carica immagine 👁️")
-    print("   8. Premium €15/mese: usa 'PREMIUM-TEST123' per test")
-    print("   9. RESPONSIVE: funziona perfettamente su PC e Mobile! 📱💻")
+    print("\n💡 FUNZIONALITÀ:")
+    print("   ✅ Login permanente (30 giorni)")
+    print("   ✅ Multilingua automatico")
+    print("   ✅ Data e ora aggiornate")
+    print("   ✅ Chat salvate (nuova chat o chiusura)")
+    print("   ✅ Generazione immagini ('genera immagine di...')")
+    print("   ✅ Generazione video ('crea video di...')")
+    print("   ✅ Analisi foto con Vision AI")
+    print("   ✅ Responsive mobile e desktop")
+    print("   ✅ Modalità ospite (no salvataggio)")
     print("\n📦 Installa: pip install flask groq bcrypt requests")
-    print("   Opzionale: pip install pytz (per timezone Italia)")
+    print("   Opzionale video reali: pip install replicate")
+    print("   Poi aggiungi REPLICATE_API_KEY nel codice")
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
