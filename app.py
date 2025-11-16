@@ -28,7 +28,7 @@ except ImportError:
 # CONFIGURAZIONE
 # ============================================
 GROQ_API_KEY = "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"
-GUMROAD_PRODUCT_URL = "https://tuoaccount.gumroad.com/l/nexus-premium"
+GUMROAD_PRODUCT_URL = "https://micheleguerra.gumroad.com/l/superchatbot"
 DATA_FILE = "nexus_data.json"
 
 os.makedirs("static/uploads", exist_ok=True)
@@ -1351,3 +1351,4 @@ if __name__ == "__main__":
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
+
