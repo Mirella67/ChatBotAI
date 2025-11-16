@@ -3,11 +3,9 @@
 """
 NEXUS AI - IL BOT PIÙ POTENTE AL MONDO
 ✨ Groq AI Ultra-Veloce
-🎨 Generazione Immagini con Stable Diffusion
-🎥 Generazione Video
+🎨 Generazione Immagini 
 📷 Analisi Immagini con Vision AI
 💳 Pagamenti Gumroad
-🌍 Multilingua Automatico
 """
 
 import os
@@ -15,11 +13,8 @@ import secrets
 import json
 import base64
 import requests
-import hmac
-import hashlib
-from datetime import datetime, timedelta
-from functools import wraps
-from flask import Flask, request, jsonify, session, render_template_string
+from datetime import datetime
+from flask import Flask, request, jsonify, session, render_template_string, redirect, url_for
 import bcrypt
 
 try:
@@ -30,16 +25,10 @@ except ImportError:
     print("⚠️ pip install groq")
 
 # ============================================
-# CONFIGURAZIONE - AGGIUNGI LE TUE API KEY
+# CONFIGURAZIONE
 # ============================================
 GROQ_API_KEY = "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"
-STABILITY_API_KEY = ""  # Per generare immagini reali: https://platform.stability.ai/
-REPLICATE_API_KEY = ""  # Per video: https://replicate.com/
-
-# GUMROAD SETTINGS
 GUMROAD_PRODUCT_URL = "https://tuoaccount.gumroad.com/l/nexus-premium"
-GUMROAD_LICENSE_KEY = ""
-
 DATA_FILE = "nexus_data.json"
 
 os.makedirs("static/uploads", exist_ok=True)
@@ -53,7 +42,7 @@ groq_client = None
 if HAS_GROQ and GROQ_API_KEY:
     try:
         groq_client = Groq(api_key=GROQ_API_KEY)
-        print("✅ Groq AI: ATTIVO - Velocità 800+ token/sec")
+        print("✅ Groq AI: ATTIVO")
     except Exception as e:
         print(f"⚠️ Groq: {e}")
 
@@ -89,44 +78,9 @@ PREMIUM_LICENSES = DB.get("premium_licenses", {})
 USED_LICENSES = set(DB.get("used_licenses", []))
 
 # ============================================
-# FUNZIONI UTILITY
-# ============================================
-def get_current_user():
-    username = session.get("username")
-    return USERS.get(username) if username else None
-
-def login_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "username" not in session:
-            return jsonify({"error": "Login richiesto"}), 401
-        return f(*args, **kwargs)
-    return wrapper
-
-def verify_gumroad_license(license_key, email):
-    """Verifica una licenza Gumroad"""
-    if not GUMROAD_LICENSE_KEY:
-        return {"success": False, "message": "Gumroad non configurato"}
-    
-    try:
-        response = requests.post(
-            "https://api.gumroad.com/v2/licenses/verify",
-            data={
-                "product_id": GUMROAD_LICENSE_KEY,
-                "license_key": license_key,
-                "increment_uses_count": "false"
-            }
-        )
-        data = response.json()
-        return data if data.get("success") else {"success": False, "message": "Licenza non valida"}
-    except Exception as e:
-        return {"success": False, "message": str(e)}
-
-# ============================================
 # AI FUNCTIONS
 # ============================================
 def call_groq(messages, model="llama-3.1-70b-versatile"):
-    """Chiama Groq AI - Il più veloce al mondo"""
     if not groq_client:
         return "⚠️ Groq non configurato. Aggiungi la tua API key."
     
@@ -140,23 +94,12 @@ def call_groq(messages, model="llama-3.1-70b-versatile"):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"Groq error: {e}")
-        return f"Mi dispiace, errore temporaneo: {e}"
+        return f"Errore AI: {e}"
 
-def generate_image_stability(prompt):
-    """Genera immagini con Stable Diffusion"""
-    # Demo mode - usa API gratuita
-    return {
-        "url": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true",
-        "demo": True
-    }
-
-def generate_video_replicate(prompt):
-    """Genera video con Replicate"""
-    return {"error": "Video generation in arrivo", "demo": True}
+def generate_image(prompt):
+    return f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true"
 
 def analyze_image_vision(image_path, question):
-    """Analizza immagini con Groq Vision"""
     if not groq_client:
         return "Vision AI non disponibile"
     
@@ -333,6 +276,10 @@ CHAT_HTML = """
         .upgrade-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba(255,107,107,0.6);
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
         }
         
         .main { 
@@ -648,18 +595,22 @@ CHAT_HTML = """
         </div>
         <div class="user-section">
             <div class="user-info">
-                <div class="avatar" id="userAvatar">U</div>
+                <div class="avatar" id="userAvatar">{{ username[0]|upper }}</div>
                 <div>
                     <div class="username" id="username">{{ username }}</div>
                     <div class="plan" id="userPlan">
-                        <span id="planBadge">{% if premium %}<span class="premium-badge">⭐ PREMIUM</span>{% else %}Free Plan{% endif %}</span>
+                        {% if premium %}
+                        <span class="premium-badge">⭐ PREMIUM</span>
+                        {% else %}
+                        <span>Free Plan</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
             {% if not premium %}
             <button class="upgrade-btn" onclick="showUpgradeModal()">🚀 UPGRADE PREMIUM</button>
             {% endif %}
-            <button class="upgrade-btn" style="background: linear-gradient(135deg, #667eea, #764ba2);" onclick="logout()">🚪 Logout</button>
+            <button class="upgrade-btn logout-btn" onclick="logout()">🚪 Logout</button>
         </div>
     </div>
 
@@ -667,29 +618,29 @@ CHAT_HTML = """
         <div class="chat" id="chat">
             <div class="welcome">
                 <div class="welcome-icon">🤖</div>
-                <h1>Benvenuto in NEXUS AI</h1>
-                <p>Il bot più potente al mondo con intelligenza artificiale ultra-veloce, generazione immagini, video, analisi avanzata e molto altro.</p>
+                <h1>Benvenuto {{ username }}!</h1>
+                <p>Sono NEXUS, il bot AI più potente al mondo. Posso generare immagini, analizzare foto e rispondere a qualsiasi domanda!</p>
                 
                 <div class="features">
                     <div class="feature">
                         <div class="feature-icon">⚡</div>
                         <h3>Ultra Veloce</h3>
-                        <p>800+ token/sec con Groq AI</p>
+                        <p>Risposte istantanee</p>
                     </div>
                     <div class="feature">
                         <div class="feature-icon">🎨</div>
                         <h3>Genera Immagini</h3>
-                        <p>Stable Diffusion HD</p>
-                    </div>
-                    <div class="feature">
-                        <div class="feature-icon">🎥</div>
-                        <h3>Genera Video</h3>
-                        <p>AI Video Generation</p>
+                        <p>Scrivi "genera immagine di..."</p>
                     </div>
                     <div class="feature">
                         <div class="feature-icon">👁️</div>
-                        <h3>Vision AI</h3>
-                        <p>Analisi immagini avanzata</p>
+                        <h3>Analizza Foto</h3>
+                        <p>Carica un'immagine con 📎</p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">💬</div>
+                        <h3>Chat Intelligente</h3>
+                        <p>Chiedi qualsiasi cosa</p>
                     </div>
                 </div>
             </div>
@@ -698,9 +649,9 @@ CHAT_HTML = """
         <div class="input-area">
             <div class="input-wrapper">
                 <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Carica immagine">📎</button>
-                <input type="file" id="fileInput" style="display: none;" accept="image/*" multiple>
+                <input type="file" id="fileInput" style="display: none;" accept="image/*">
                 
-                <textarea id="input" placeholder="Scrivi un messaggio... (es: genera un'immagine di..., analizza questa foto...)" 
+                <textarea id="input" placeholder="Prova: 'genera un'immagine di un gatto spaziale' oppure 'ciao, come stai?'" 
                     onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
                 
                 <button id="sendBtn" onclick="sendMessage()">➤</button>
@@ -711,7 +662,7 @@ CHAT_HTML = """
     <div id="upgradeModal" class="modal">
         <div class="modal-content">
             <h2>🚀 Upgrade a Premium</h2>
-            <p style="margin-bottom: 20px; color: #aaa;">Sblocca tutte le funzionalità avanzate</p>
+            <p style="margin-bottom: 20px; color: #aaa;">Sblocca chat illimitate e funzionalità avanzate</p>
             <input type="text" id="licenseKey" placeholder="Inserisci License Key Gumroad">
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeUpgradeModal()">Chiudi</button>
@@ -721,11 +672,9 @@ CHAT_HTML = """
     </div>
 
     <script>
-        let selectedFiles = [];
-        let currentChatId = Date.now();
-        
+        let selectedFile = null;
+
         function newChat() {
-            currentChatId = Date.now();
             document.getElementById('chat').innerHTML = `
                 <div class="welcome">
                     <div class="welcome-icon">🤖</div>
@@ -734,17 +683,18 @@ CHAT_HTML = """
                 </div>
             `;
             document.getElementById('input').value = '';
-            selectedFiles = [];
+            selectedFile = null;
         }
 
         async function sendMessage() {
             const input = document.getElementById('input');
             const text = input.value.trim();
             
-            if (!text && selectedFiles.length === 0) return;
+            if (!text && !selectedFile) return;
             
+            const sendBtn = document.getElementById('sendBtn');
             input.disabled = true;
-            document.getElementById('sendBtn').disabled = true;
+            sendBtn.disabled = true;
             
             const welcome = document.querySelector('.welcome');
             if (welcome) welcome.remove();
@@ -756,17 +706,14 @@ CHAT_HTML = """
                 const formData = new FormData();
                 formData.append('message', text);
                 
-                let requestType = 'chat';
-                const lowerText = text.toLowerCase();
-                
-                if (lowerText.includes('genera') && (lowerText.includes('immagine') || lowerText.includes('foto'))) {
-                    requestType = 'image';
-                } else if (selectedFiles.length > 0) {
-                    requestType = 'vision';
-                    selectedFiles.forEach(file => formData.append('files', file));
+                if (selectedFile) {
+                    formData.append('file', selectedFile);
+                    formData.append('type', 'vision');
+                } else if (text.toLowerCase().includes('genera') && (text.toLowerCase().includes('immagine') || text.toLowerCase().includes('immagin') || text.toLowerCase().includes('foto') || text.toLowerCase().includes('disegn'))) {
+                    formData.append('type', 'image');
+                } else {
+                    formData.append('type', 'chat');
                 }
-                
-                formData.append('type', requestType);
                 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -785,9 +732,9 @@ CHAT_HTML = """
                 addMessageToUI('bot', '❌ Errore: ' + error.message);
             } finally {
                 input.disabled = false;
-                document.getElementById('sendBtn').disabled = false;
+                sendBtn.disabled = false;
                 input.focus();
-                selectedFiles = [];
+                selectedFile = null;
             }
         }
 
@@ -797,7 +744,7 @@ CHAT_HTML = """
             
             let mediaHtml = '';
             if (media) {
-                mediaHtml = `<img src="${media}" alt="Generated" style="max-width: 100%; border-radius: 12px; margin-top: 12px;">`;
+                mediaHtml = `<img src="${media}" alt="Generated" loading="lazy">`;
             }
             
             const messageDiv = document.createElement('div');
@@ -815,7 +762,10 @@ CHAT_HTML = """
         }
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
-            selectedFiles = Array.from(e.target.files).slice(0, 5);
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                addMessageToUI('user', `📎 Immagine caricata: ${selectedFile.name}`);
+            }
         });
 
         function showUpgradeModal() {
@@ -844,24 +794,22 @@ CHAT_HTML = """
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Premium attivato con successo!');
+                    alert('✅ Premium attivato!');
                     closeUpgradeModal();
                     location.reload();
                 } else {
                     alert('❌ ' + (data.message || 'License key non valida'));
                 }
             } catch (error) {
-                alert('❌ Errore durante l\'attivazione');
+                alert('❌ Errore attivazione');
             }
         }
 
         async function logout() {
             try {
                 await fetch('/api/logout', { method: 'POST' });
-                window.location.href = '/login';
-            } catch (e) {
-                window.location.href = '/login';
-            }
+            } catch(e) {}
+            window.location.href = '/login';
         }
 
         document.getElementById('input').addEventListener('input', function() {
@@ -1171,9 +1119,11 @@ LOGIN_HTML = """
 @app.route("/")
 def index():
     if "username" not in session:
-        return render_template_string(LOGIN_HTML)
+        return redirect(url_for('login_page'))
     
-    user = get_current_user()
+    username = session.get("username")
+    user = USERS.get(username, {})
+    
     return render_template_string(
         CHAT_HTML, 
         username=user.get("username", "User"),
@@ -1214,7 +1164,7 @@ def register():
         return jsonify({"success": True})
     except Exception as e:
         print(f"Register error: {e}")
-        return jsonify({"success": False, "message": "Errore durante la registrazione"})
+        return jsonify({"success": False, "message": "Errore registrazione"})
 
 @app.route("/api/login", methods=["POST"])
 def login():
@@ -1235,7 +1185,7 @@ def login():
         return jsonify({"success": True})
     except Exception as e:
         print(f"Login error: {e}")
-        return jsonify({"success": False, "message": "Errore durante il login"})
+        return jsonify({"success": False, "message": "Errore login"})
 
 @app.route("/api/logout", methods=["POST"])
 def logout():
@@ -1243,10 +1193,17 @@ def logout():
     return jsonify({"success": True})
 
 @app.route("/api/chat", methods=["POST"])
-@login_required
 def chat():
     try:
-        user = get_current_user()
+        if "username" not in session:
+            return jsonify({"error": "Login richiesto"}), 401
+        
+        username = session.get("username")
+        user = USERS.get(username)
+        
+        if not user:
+            return jsonify({"error": "Utente non trovato"}), 404
+        
         message = request.form.get("message", "").strip()
         request_type = request.form.get("type", "chat")
         
@@ -1254,7 +1211,7 @@ def chat():
             today_count = user.get("chat_count", 0)
             if today_count >= 50:
                 return jsonify({
-                    "error": "Hai raggiunto il limite giornaliero. Passa a Premium per chat illimitate!",
+                    "error": "Limite giornaliero raggiunto (50 messaggi). Passa a Premium per chat illimitate!",
                     "upgrade": True
                 })
         
@@ -1262,27 +1219,26 @@ def chat():
         save_db()
         
         if request_type == "image":
-            result = generate_image_stability(message)
+            image_url = generate_image(message)
             return jsonify({
                 "success": True,
                 "response": "✨ Ecco l'immagine generata:",
-                "type": "image",
-                "media": result["url"]
+                "media": image_url
             })
         
-        elif request_type == "vision" and request.files:
-            file = request.files.getlist("files")[0]
-            filename = f"upload_{secrets.token_hex(8)}.{file.filename.split('.')[-1]}"
-            filepath = os.path.join("static/uploads", filename)
-            file.save(filepath)
-            
-            analysis = analyze_image_vision(filepath, message or "Descrivi questa immagine in dettaglio")
-            
-            return jsonify({
-                "success": True,
-                "response": f"👁️ **Analisi dell'immagine:**\n\n{analysis}",
-                "type": "vision"
-            })
+        elif request_type == "vision" and 'file' in request.files:
+            file = request.files['file']
+            if file:
+                filename = f"upload_{secrets.token_hex(8)}.{file.filename.split('.')[-1]}"
+                filepath = os.path.join("static/uploads", filename)
+                file.save(filepath)
+                
+                analysis = analyze_image_vision(filepath, message or "Descrivi questa immagine in dettaglio")
+                
+                return jsonify({
+                    "success": True,
+                    "response": f"👁️ Analisi dell'immagine:\n\n{analysis}"
+                })
         
         else:
             messages = [
@@ -1292,18 +1248,18 @@ def chat():
                     
 Caratteristiche:
 - Ultra-veloce e intelligente
-- Esperto in programmazione, matematica, scienza, arte, scrittura
-- Creativo e innovativo
-- Amichevole ma professionale
+- Esperto in tutti gli ambiti: programmazione, matematica, scienza, arte, scrittura
+- Creativo, innovativo e amichevole
+- Dai risposte complete, chiare e coinvolgenti
 
 Capacità speciali:
-🎨 Generazione immagini HD
-👁️ Analisi immagini avanzata
-💻 Programmazione in tutti i linguaggi
-📊 Analisi dati e visualizzazioni
+🎨 Generazione immagini HD (l'utente può chiederti "genera un'immagine di...")
+👁️ Analisi immagini avanzata (l'utente può caricare foto)
+💻 Programmazione esperta
+📊 Analisi e problem solving
 ✍️ Scrittura creativa
 
-Rispondi sempre in modo chiaro, completo e coinvolgente."""
+Rispondi sempre in italiano in modo naturale e utile."""
                 },
                 {
                     "role": "user",
@@ -1316,8 +1272,7 @@ Rispondi sempre in modo chiaro, completo e coinvolgente."""
             
             return jsonify({
                 "success": True,
-                "response": response,
-                "type": "text"
+                "response": response
             })
     
     except Exception as e:
@@ -1327,9 +1282,11 @@ Rispondi sempre in modo chiaro, completo e coinvolgente."""
         }), 500
 
 @app.route("/api/activate-premium", methods=["POST"])
-@login_required
 def activate_premium():
     try:
+        if "username" not in session:
+            return jsonify({"success": False, "message": "Login richiesto"}), 401
+        
         data = request.json
         license_key = data.get("license_key", "").strip()
         
@@ -1337,20 +1294,20 @@ def activate_premium():
             return jsonify({"success": False, "message": "License key mancante"})
         
         if license_key in USED_LICENSES:
-            return jsonify({"success": False, "message": "Questa license key è già stata utilizzata"})
+            return jsonify({"success": False, "message": "License key già utilizzata"})
         
-        user = get_current_user()
+        username = session.get("username")
+        user = USERS.get(username)
         
-        result = verify_gumroad_license(license_key, user.get("email", ""))
-        
-        if result.get("success"):
+        # Per testing, accetta qualsiasi key che inizia con "PREMIUM-"
+        if license_key.startswith("PREMIUM-"):
             user["premium"] = True
             user["premium_activated_at"] = datetime.utcnow().isoformat()
             user["license_key"] = license_key
             
             USED_LICENSES.add(license_key)
             PREMIUM_LICENSES[license_key] = {
-                "username": user["username"],
+                "username": username,
                 "activated_at": datetime.utcnow().isoformat()
             }
             
@@ -1358,19 +1315,19 @@ def activate_premium():
             
             return jsonify({
                 "success": True,
-                "message": "Premium attivato con successo!"
+                "message": "Premium attivato!"
             })
         else:
             return jsonify({
                 "success": False,
-                "message": result.get("message", "License key non valida")
+                "message": "License key non valida (usa formato: PREMIUM-XXX per test)"
             })
     
     except Exception as e:
-        print(f"Premium activation error: {e}")
+        print(f"Premium error: {e}")
         return jsonify({
             "success": False,
-            "message": "Errore durante l'attivazione"
+            "message": "Errore attivazione"
         }), 500
 
 # ============================================
@@ -1382,10 +1339,15 @@ if __name__ == "__main__":
     print("⚡ NEXUS AI - IL BOT PIÙ POTENTE AL MONDO")
     print("="*60)
     print(f"✅ Groq AI: {'ATTIVO' if groq_client else 'NON CONFIGURATO'}")
-    print(f"✅ Stability API: {'ATTIVO' if STABILITY_API_KEY else 'DEMO MODE'}")
-    print(f"\n📊 Utenti registrati: {len(USERS)}")
-    print(f"💎 Utenti Premium: {sum(1 for u in USERS.values() if u.get('premium', False))}")
-    print("\n🌐 Server avviato su: http://127.0.0.1:5000")
+    print(f"\n📊 Utenti: {len(USERS)}")
+    print(f"💎 Premium: {sum(1 for u in USERS.values() if u.get('premium', False))}")
+    print("\n🌐 Server: http://127.0.0.1:5000")
+    print("\n💡 ISTRUZIONI:")
+    print("   1. Registrati/Login")
+    print("   2. Scrivi messaggi normali per chattare")
+    print("   3. Scrivi 'genera un'immagine di...' per creare immagini")
+    print("   4. Clicca 📎 per caricare e analizzare foto")
+    print("   5. Test Premium: usa key 'PREMIUM-TEST123'")
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
