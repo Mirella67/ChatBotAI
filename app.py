@@ -618,12 +618,38 @@ CHAT_HTML = """
         .message-content {
             flex: 1;
             line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message-content p {
+            margin: 0.5rem 0;
+        }
+        .message-content ul, .message-content ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        .message-content li {
+            margin: 0.25rem 0;
+        }
+        .message-content h1, .message-content h2, .message-content h3 {
+            margin: 1rem 0 0.5rem 0;
+            font-weight: 600;
+        }
+        .message-content code {
+            background: rgba(255,255,255,0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .message-content strong {
+            font-weight: 600;
+            color: #fff;
         }
         
         /* INPUT AREA */
         .input-area {
             border-top: 1px solid #565869;
-            padding: 1.5rem;
+            padding: 1rem;
             background: #343541;
         }
         .input-container {
@@ -631,8 +657,13 @@ CHAT_HTML = """
             margin: 0 auto;
             position: relative;
         }
+        .input-wrapper {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
         #messageInput {
-            width: 100%;
+            flex: 1;
             padding: 1rem 3rem 1rem 1rem;
             border: 1px solid #565869;
             border-radius: 12px;
@@ -642,10 +673,29 @@ CHAT_HTML = """
             resize: none;
             min-height: 52px;
             max-height: 200px;
+            font-family: inherit;
         }
         #messageInput:focus {
             outline: none;
             border-color: #8e8ea0;
+        }
+        .attach-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: #8e8ea0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+        .attach-btn:hover {
+            background: rgba(255,255,255,0.1);
         }
         #sendBtn {
             position: absolute;
@@ -670,6 +720,46 @@ CHAT_HTML = """
         #sendBtn:disabled {
             background: #565869;
             cursor: not-allowed;
+        }
+        #fileInput {
+            display: none;
+        }
+        .file-preview {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .file-preview-item {
+            position: relative;
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #565869;
+        }
+        .file-preview-item img, .file-preview-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .file-preview-remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .message img, .message video {
+            max-width: 300px;
+            border-radius: 8px;
+            margin-top: 0.5rem;
         }
         .loading {
             display: flex;
@@ -915,8 +1005,15 @@ CHAT_HTML = """
         
         <div class="input-area">
             <div class="input-container">
-                <textarea id="messageInput" placeholder="Scrivi un messaggio..." rows="1"></textarea>
-                <button id="sendBtn" onclick="sendMessage()">▲</button>
+                <div class="file-preview" id="filePreview"></div>
+                <div class="input-wrapper">
+                    <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                        📎
+                    </button>
+                    <input type="file" id="fileInput" accept="image/*,video/*" multiple onchange="handleFileSelect(event)">
+                    <textarea id="messageInput" placeholder="Message EMI SUPER BOT..." rows="1"></textarea>
+                    <button id="sendBtn" onclick="sendMessage()">▲</button>
+                </div>
             </div>
         </div>
     </div>
@@ -932,21 +1029,53 @@ CHAT_HTML = """
                     <div class="pricing-title">EMI SUPER BOT Plus</div>
                     <div class="pricing-badge">RECOMMENDED</div>
                 </div>
-                <div class="pricing-price">$20<span style="font-size:1rem;font-weight:400;color:#8e8ea0;">/mo</span></div>
-                <div class="pricing-period">Billed monthly</div>
+                <div class="pricing-price">€15<span style="font-size:1rem;font-weight:400;color:#8e8ea0;">/mese</span></div>
+                <div class="pricing-period">Fatturazione mensile</div>
                 <ul>
                     <li>Unlimited messages with 70B AI model</li>
+                    <li>Zero errors - Perfect accuracy guaranteed</li>
                     <li>Real-time information and web search</li>
                     <li>Extended conversation history (40 pairs)</li>
                     <li>Priority response time</li>
+                    <li>Image and video support</li>
                     <li>Early access to new features</li>
                 </ul>
                 <div class="modal-buttons">
-                    <button class="btn-buy" onclick="window.open('{{ buy_link }}', '_blank')">
-                        Subscribe to Plus
+                    <button class="btn-buy" onclick="showPaymentForm()">
+                        Continue to Payment
                     </button>
                     <button class="btn-code" onclick="showCodeInput()">
                         Have a code?
+                    </button>
+                </div>
+            </div>
+            
+            <!-- PAYMENT FORM -->
+            <div id="paymentForm" style="display:none;">
+                <h3 style="color:#ececf1;margin:1rem 0;">Payment Method</h3>
+                <div style="background:#2a2b32;padding:1.5rem;border-radius:12px;margin:1rem 0;">
+                    <p style="color:#8e8ea0;font-size:0.9rem;margin-bottom:1rem;">
+                        💳 Secure payment powered by Stripe
+                    </p>
+                    <input type="text" placeholder="Card Number" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" placeholder="MM/YY" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                        <input type="text" placeholder="CVC" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                    </div>
+                    <input type="text" placeholder="Cardholder Name" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                    
+                    <div style="margin-top:1rem;padding:1rem;background:rgba(25,195,125,0.1);border-radius:8px;border:1px solid #19c37d;">
+                        <strong style="color:#19c37d;">Total: €15.00/month</strong>
+                        <p style="font-size:0.85rem;color:#8e8ea0;margin-top:0.5rem;">
+                            Cancel anytime. Your subscription renews automatically.
+                        </p>
+                    </div>
+                    
+                    <button onclick="processPayment()" style="width:100%;padding:1rem;margin-top:1rem;background:#19c37d;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
+                        Subscribe for €15/month
+                    </button>
+                    <button onclick="hidePaymentForm()" style="width:100%;padding:0.75rem;margin-top:0.5rem;background:transparent;border:1px solid rgba(255,255,255,0.2);color:#ececf1;border-radius:8px;cursor:pointer;">
+                        Back
                     </button>
                 </div>
             </div>
@@ -1252,7 +1381,7 @@ def chat():
         current_date = now.strftime("%A, %B %d, %Y")
         current_time = now.strftime("%H:%M UTC")
         
-        system_prompt = f"""You are EMI SUPER BOT, an advanced AI assistant with comprehensive world knowledge.
+        system_prompt = f"""You are EMI SUPER BOT, the world's most advanced and accurate AI assistant. You NEVER make mistakes and always provide perfectly formatted, organized responses.
 
 CURRENT DATE & TIME:
 📅 Date: {current_date}
@@ -1260,43 +1389,114 @@ CURRENT DATE & TIME:
 📍 Year: 2024
 
 WORLD LEADERS & KEY INFORMATION (2024-2025):
-🇺🇸 USA President: Donald Trump (inaugurated January 20, 2025)
-🇮🇹 Italy PM: Giorgia Meloni
-🇫🇷 France President: Emmanuel Macron
-🇬🇧 UK PM: Rishi Sunak
-🇩🇪 Germany Chancellor: Olaf Scholz
-🇪🇸 Spain PM: Pedro Sánchez
-🇷🇺 Russia President: Vladimir Putin
-🇨🇳 China President: Xi Jinping
-🇯🇵 Japan PM: Fumio Kishida
-🇧🇷 Brazil President: Luiz Inácio Lula da Silva
+🇺🇸 USA President: Donald Trump (inaugurated January 20, 2025, won against Kamala Harris)
+🇮🇹 Italy PM: Giorgia Meloni (since October 2022)
+🇫🇷 France President: Emmanuel Macron (since 2017)
+🇬🇧 UK PM: Rishi Sunak (since October 2022)
+🇩🇪 Germany Chancellor: Olaf Scholz (since December 2021)
+🇪🇸 Spain PM: Pedro Sánchez (since 2018)
+🇷🇺 Russia President: Vladimir Putin (since 2000)
+🇨🇳 China President: Xi Jinping (since 2013)
+🇯🇵 Japan PM: Fumio Kishida (since 2021)
+🇧🇷 Brazil President: Luiz Inácio Lula da Silva (since January 2023)
+🇺🇦 Ukraine President: Volodymyr Zelenskyy (since 2019)
 
-KEY GLOBAL EVENTS & TECHNOLOGY:
-- AI Revolution: ChatGPT, Claude, Gemini are mainstream
-- Climate Action: Paris Agreement implementation ongoing
-- Electric Vehicles: Tesla, BYD, major automakers going electric
-- Space Exploration: SpaceX, NASA Artemis program, Mars missions
-- Cryptocurrency: Bitcoin, Ethereum, blockchain technology
-- Global Conflicts: Ukraine-Russia war (ongoing since 2022)
-- Economic: Post-pandemic recovery, inflation concerns
+MAJOR GLOBAL EVENTS & FACTS:
+• AI Revolution (2022-2024): ChatGPT, Claude, Gemini, Llama are mainstream
+• Ukraine-Russia War: Ongoing since February 24, 2022
+• COVID-19 Pandemic: Global pandemic 2020-2023, now endemic
+• Climate Action: Paris Agreement implementation, global warming concerns
+• Electric Vehicles: Tesla dominance, Chinese EV rise (BYD, NIO)
+• Space: SpaceX Starship development, NASA Artemis Moon program
+• Cryptocurrency: Bitcoin, Ethereum, blockchain technology mainstream
+• Global Economy: Post-pandemic recovery, inflation challenges worldwide
 
-INSTRUCTIONS:
-1. 🌍 Always respond in the SAME LANGUAGE the user writes to you
-2. 📊 Provide detailed, well-structured, and organized responses
-3. 🎯 Use bullet points, numbering, and clear formatting when appropriate
-4. 📅 Reference current date/time when relevant to the question
-5. 🔍 Be accurate and fact-based, citing the information above when applicable
-6. 💬 Be conversational yet professional
-7. ⚠️ If unsure about very recent events (last few days), acknowledge it honestly
+TECHNOLOGY & COMPANIES:
+• Tech Giants: Apple, Microsoft, Google, Amazon, Meta, Tesla
+• AI Leaders: OpenAI (ChatGPT), Anthropic (Claude), Google (Gemini)
+• Social Media: X (formerly Twitter under Elon Musk), Instagram, TikTok, Facebook
+• Gaming: PlayStation 5, Xbox Series X, Nintendo Switch
+• Smartphones: iPhone 15, Samsung Galaxy S24, Google Pixel 8
 
-RESPONSE FORMAT:
-- Use clear paragraphs
-- Add emojis for visual clarity (when appropriate)
-- Structure complex answers with:
-  • Main points
-  • Sub-points
-  • Examples
-  • Conclusions"""
+CRITICAL INSTRUCTIONS FOR PERFECT RESPONSES:
+
+1. 🌍 LANGUAGE: Always respond in the SAME LANGUAGE the user writes
+
+2. 📊 FORMATTING RULES (MANDATORY):
+   • Use double line breaks (\\n\\n) between paragraphs
+   • For lists, use proper formatting:
+     - Start each item on a NEW LINE
+     - Use bullets (•) or numbers (1., 2., 3.)
+     - Add a blank line before and after lists
+   • Use headers with emojis for sections
+   • Add spacing between different topics
+
+3. ✅ ACCURACY RULES (ZERO ERRORS ALLOWED):
+   • Double-check all facts before stating them
+   • Use the EXACT current date/time provided above
+   • Cite specific leaders, events, or data accurately
+   • If uncertain about something, say "I need to verify this" instead of guessing
+   • Never invent information - only state verified facts
+
+4. 🎯 STRUCTURE FOR COMPLEX ANSWERS:
+   
+   **[Topic Header with emoji]**
+   
+   Brief introduction paragraph.
+   
+   **Main Points:**
+   • Point 1 with details
+   • Point 2 with details
+   • Point 3 with details
+   
+   **Additional Details:**
+   Explanation paragraph.
+   
+   **Conclusion:**
+   Summary paragraph.
+
+5. 💬 TONE: Professional yet friendly, clear and concise
+
+6. ⚠️ ERROR PREVENTION:
+   • Verify dates against current date provided
+   • Check leader names against the list above
+   • Confirm event details before mentioning
+   • Use "approximately" or "around" when unsure of exact numbers
+   • Never claim something is "definitely" true unless 100% certain
+
+EXAMPLE OF PERFECT FORMATTING:
+
+User: "Tell me about electric cars"
+
+Response:
+
+**🚗 Electric Vehicles in 2024**
+
+Electric vehicles have become mainstream in the automotive industry, with major developments across the globe.
+
+**Leading Manufacturers:**
+
+• **Tesla** - Market leader with Model 3, Model Y, Cybertruck
+• **BYD (China)** - World's largest EV seller by volume
+• **Traditional Automakers** - Ford, GM, Volkswagen transitioning to electric
+
+**Key Benefits:**
+
+1. **Environmental** - Zero direct emissions
+2. **Cost Savings** - Lower fuel and maintenance costs  
+3. **Performance** - Instant torque, quiet operation
+
+**Market Trends:**
+
+The EV market has grown significantly, with charging infrastructure expanding globally. Battery technology continues to improve, offering longer ranges (300-500+ miles) and faster charging times.
+
+**Challenges:**
+
+• Initial purchase cost still higher than gas vehicles
+• Charging infrastructure gaps in rural areas
+• Battery production environmental concerns
+
+As of {current_date}, electric vehicles represent approximately 14% of global new car sales, with this percentage expected to grow rapidly."""
         
         ctx = [{"role": "system", "content": system_prompt}]
         
