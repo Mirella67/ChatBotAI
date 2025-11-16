@@ -33,12 +33,12 @@ except ImportError:
 # CONFIGURAZIONE - AGGIUNGI LE TUE API KEY
 # ============================================
 GROQ_API_KEY = "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"
-STABILITY_API_KEY = "sk-1nh5FBGJETSbU1DMnQu7Af0dWQLSBbUwDvS1qXUPvVQ5lx0d"  # Per generare immagini reali: https://platform.stability.ai/
-REPLICATE_API_KEY = "r8_dvhoEsZoMZ4iVPCeLtenbcaML0VZw5233ilJP"  # Per video: https://replicate.com/
+STABILITY_API_KEY = ""  # Per generare immagini reali: https://platform.stability.ai/
+REPLICATE_API_KEY = ""  # Per video: https://replicate.com/
 
 # GUMROAD SETTINGS
-GUMROAD_PRODUCT_URL = "https://micheleguerra.gumroad.com/l/superchatbot"  # IL TUO LINK GUMROAD
-GUMROAD_LICENSE_KEY = ""  # La tua License Key da Gumroad Settings
+GUMROAD_PRODUCT_URL = "https://tuoaccount.gumroad.com/l/nexus-premium"
+GUMROAD_LICENSE_KEY = ""
 
 DATA_FILE = "nexus_data.json"
 
@@ -62,14 +62,12 @@ if HAS_GROQ and GROQ_API_KEY:
 # ============================================
 def load_db():
     if not os.path.exists(DATA_FILE):
-        return {"users": {}, "premium_licenses": {}, "used_licenses": set()}
+        return {"users": {}, "premium_licenses": {}, "used_licenses": []}
     try:
         with open(DATA_FILE, "r") as f:
-            data = json.load(f)
-            data["used_licenses"] = set(data.get("used_licenses", []))
-            return data
+            return json.load(f)
     except:
-        return {"users": {}, "premium_licenses": {}, "used_licenses": set()}
+        return {"users": {}, "premium_licenses": {}, "used_licenses": []}
 
 def save_db():
     try:
@@ -88,15 +86,12 @@ def save_db():
 DB = load_db()
 USERS = DB.get("users", {})
 PREMIUM_LICENSES = DB.get("premium_licenses", {})
-USED_LICENSES = DB.get("used_licenses", set())
+USED_LICENSES = set(DB.get("used_licenses", []))
 
 # ============================================
 # FUNZIONI UTILITY
 # ============================================
-def get_today():
-    return datetime.utcnow().strftime("%Y-%m-%d")
-
-def get_user():
+def get_current_user():
     username = session.get("username")
     return USERS.get(username) if username else None
 
@@ -122,22 +117,9 @@ def verify_gumroad_license(license_key, email):
                 "increment_uses_count": "false"
             }
         )
-        
         data = response.json()
-        
-        if data.get("success"):
-            return {
-                "success": True,
-                "purchase": data.get("purchase", {}),
-                "uses": data.get("uses", 0)
-            }
-        else:
-            return {
-                "success": False,
-                "message": data.get("message", "Licenza non valida")
-            }
+        return data if data.get("success") else {"success": False, "message": "Licenza non valida"}
     except Exception as e:
-        print(f"Gumroad verify error: {e}")
         return {"success": False, "message": str(e)}
 
 # ============================================
@@ -146,7 +128,7 @@ def verify_gumroad_license(license_key, email):
 def call_groq(messages, model="llama-3.1-70b-versatile"):
     """Chiama Groq AI - Il più veloce al mondo"""
     if not groq_client:
-        return "⚠️ Groq non configurato"
+        return "⚠️ Groq non configurato. Aggiungi la tua API key."
     
     try:
         response = groq_client.chat.completions.create(
@@ -159,61 +141,18 @@ def call_groq(messages, model="llama-3.1-70b-versatile"):
         return response.choices[0].message.content
     except Exception as e:
         print(f"Groq error: {e}")
-        return "Mi dispiace, errore temporaneo. Riprova."
+        return f"Mi dispiace, errore temporaneo: {e}"
 
 def generate_image_stability(prompt):
     """Genera immagini con Stable Diffusion"""
-    if not STABILITY_API_KEY:
-        # Demo mode - genera placeholder
-        return {
-            "url": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true",
-            "demo": True
-        }
-    
-    try:
-        response = requests.post(
-            "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
-            headers={
-                "Authorization": f"Bearer {STABILITY_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "text_prompts": [{"text": prompt, "weight": 1}],
-                "cfg_scale": 7,
-                "height": 768,
-                "width": 768,
-                "samples": 1,
-                "steps": 30,
-            },
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            image_data = data["artifacts"][0]["base64"]
-            filename = f"gen_{secrets.token_hex(8)}.png"
-            filepath = os.path.join("static/generated", filename)
-            
-            with open(filepath, "wb") as f:
-                f.write(base64.b64decode(image_data))
-            
-            return {"url": f"/static/generated/{filename}"}
-        else:
-            return {
-                "url": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true",
-                "demo": True
-            }
-    except Exception as e:
-        print(f"Stability error: {e}")
-        return {
-            "url": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true",
-            "demo": True
-        }
+    # Demo mode - usa API gratuita
+    return {
+        "url": f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=768&height=768&nologo=true",
+        "demo": True
+    }
 
 def generate_video_replicate(prompt):
     """Genera video con Replicate"""
-    if not REPLICATE_API_KEY:
-        return {"error": "API Replicate non configurata", "demo": True}
-    
     return {"error": "Video generation in arrivo", "demo": True}
 
 def analyze_image_vision(image_path, question):
@@ -238,12 +177,12 @@ def analyze_image_vision(image_path, question):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"Vision error: {e}")
         return f"Analisi non disponibile: {e}"
 
 # ============================================
-# HTML TEMPLATE ULTRA MODERNO
+# HTML TEMPLATES
 # ============================================
+
 CHAT_HTML = """
 <!DOCTYPE html>
 <html lang="it">
@@ -327,26 +266,6 @@ CHAT_HTML = """
             padding: 16px; 
         }
         
-        .sidebar-content::-webkit-scrollbar { width: 6px; }
-        .sidebar-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .sidebar-content::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.3); border-radius: 3px; }
-        
-        .chat-item {
-            padding: 12px;
-            margin-bottom: 8px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: 1px solid transparent;
-        }
-        
-        .chat-item:hover {
-            background: rgba(102,126,234,0.15);
-            border-color: rgba(102,126,234,0.3);
-            transform: translateX(4px);
-        }
-        
         .user-section { 
             border-top: 1px solid rgba(102,126,234,0.2); 
             padding: 20px; 
@@ -420,7 +339,6 @@ CHAT_HTML = """
             flex: 1; 
             display: flex; 
             flex-direction: column; 
-            position: relative;
         }
         
         .chat { 
@@ -428,10 +346,6 @@ CHAT_HTML = """
             overflow-y: auto; 
             padding: 24px;
         }
-        
-        .chat::-webkit-scrollbar { width: 8px; }
-        .chat::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .chat::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.3); border-radius: 4px; }
         
         .message { 
             max-width: 900px; 
@@ -471,6 +385,7 @@ CHAT_HTML = """
             max-width: 700px;
             line-height: 1.6;
             box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            white-space: pre-wrap;
         }
         
         .bubble.bot { 
@@ -483,16 +398,12 @@ CHAT_HTML = """
             border: 1px solid rgba(240,147,251,0.3);
         }
         
-        .bubble img, .bubble video { 
+        .bubble img { 
             max-width: 100%; 
             border-radius: 12px; 
             margin-top: 12px; 
             display: block;
             box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-        }
-        
-        .bubble video { 
-            max-height: 400px; 
         }
         
         .input-area { 
@@ -508,44 +419,6 @@ CHAT_HTML = """
             display: flex; 
             gap: 12px; 
             align-items: flex-end;
-        }
-        
-        .file-preview { 
-            display: flex; 
-            gap: 10px; 
-            margin-bottom: 12px; 
-            flex-wrap: wrap; 
-        }
-        
-        .preview-item { 
-            position: relative; 
-            width: 90px; 
-            height: 90px; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            border: 2px solid rgba(102,126,234,0.3);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        
-        .preview-item img, .preview-item video { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-        }
-        
-        .preview-remove { 
-            position: absolute; 
-            top: 6px; 
-            right: 6px; 
-            background: rgba(0,0,0,0.8); 
-            color: #fff; 
-            border: none; 
-            border-radius: 50%; 
-            width: 24px; 
-            height: 24px; 
-            cursor: pointer; 
-            font-size: 14px;
-            font-weight: bold;
         }
         
         .tool-btn { 
@@ -564,7 +437,6 @@ CHAT_HTML = """
         .tool-btn:hover { 
             background: rgba(102,126,234,0.4);
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102,126,234,0.3);
         }
         
         #input { 
@@ -586,7 +458,6 @@ CHAT_HTML = """
             outline: none; 
             border-color: #667eea;
             background: rgba(255,255,255,0.08);
-            box-shadow: 0 0 20px rgba(102,126,234,0.2);
         }
         
         #input::placeholder {
@@ -602,11 +473,7 @@ CHAT_HTML = """
             color: #fff; 
             cursor: pointer; 
             font-size: 22px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
             flex-shrink: 0;
         }
         
@@ -618,28 +485,6 @@ CHAT_HTML = """
         #sendBtn:disabled { 
             opacity: 0.5; 
             cursor: not-allowed;
-            transform: none;
-        }
-        
-        .loading { 
-            display: flex; 
-            gap: 6px; 
-        }
-        
-        .loading div { 
-            width: 10px; 
-            height: 10px; 
-            border-radius: 50%; 
-            background: #667eea; 
-            animation: bounce 1.4s infinite ease-in-out both; 
-        }
-        
-        .loading div:nth-child(1) { animation-delay: -0.32s; }
-        .loading div:nth-child(2) { animation-delay: -0.16s; }
-        
-        @keyframes bounce { 
-            0%, 80%, 100% { transform: scale(0); } 
-            40% { transform: scale(1); } 
         }
         
         .welcome { 
@@ -662,7 +507,6 @@ CHAT_HTML = """
             justify-content: center; 
             font-size: 60px; 
             margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(102,126,234,0.5);
             animation: glow 2s infinite;
         }
         
@@ -766,15 +610,6 @@ CHAT_HTML = """
             margin-bottom: 20px;
         }
         
-        .modal-content input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .modal-content input::placeholder {
-            color: rgba(255,255,255,0.4);
-        }
-        
         .modal-buttons {
             display: flex;
             gap: 12px;
@@ -795,77 +630,13 @@ CHAT_HTML = """
             color: #fff;
         }
         
-        .modal-btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102,126,234,0.5);
-        }
-        
         .modal-btn.secondary {
             background: rgba(255,255,255,0.1);
             color: #fff;
         }
-        
-        .modal-btn.secondary:hover {
-            background: rgba(255,255,255,0.15);
-        }
-        
-        .gumroad-link {
-            display: block;
-            margin-top: 15px;
-            color: #FF6B6B;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        
-        .gumroad-link:hover {
-            color: #FF8E53;
-            transform: translateX(4px);
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar { 
-                position: fixed; 
-                left: 0; 
-                top: 0; 
-                height: 100vh; 
-                z-index: 100; 
-                transform: translateX(-100%); 
-                transition: transform 0.3s; 
-            }
-            .sidebar.open { transform: translateX(0); }
-            .mobile-header { 
-                display: flex; 
-                align-items: center; 
-                justify-content: space-between; 
-                padding: 16px 20px; 
-                background: rgba(10,10,10,0.95); 
-                border-bottom: 1px solid rgba(102,126,234,0.2);
-                backdrop-filter: blur(20px);
-            }
-            .menu-btn { 
-                background: none; 
-                border: none; 
-                color: #fff; 
-                font-size: 28px; 
-                cursor: pointer; 
-            }
-            .features {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (min-width: 769px) {
-            .mobile-header { display: none; }
-        }
     </style>
 </head>
 <body>
-    <div class="mobile-header">
-        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-        <span style="font-weight: 600;">NEXUS AI</span>
-    </div>
-
     <div class="sidebar">
         <div class="logo">
             <h1>⚡ NEXUS</h1>
@@ -879,18 +650,16 @@ CHAT_HTML = """
             <div class="user-info">
                 <div class="avatar" id="userAvatar">U</div>
                 <div>
-                    <div class="username" id="username">Guest</div>
+                    <div class="username" id="username">{{ username }}</div>
                     <div class="plan" id="userPlan">
-                        <span id="planBadge">Free Plan</span>
+                        <span id="planBadge">{% if premium %}<span class="premium-badge">⭐ PREMIUM</span>{% else %}Free Plan{% endif %}</span>
                     </div>
                 </div>
             </div>
-            <button class="upgrade-btn" onclick="showUpgradeModal()">
-                🚀 UPGRADE PREMIUM
-            </button>
-            <button class="upgrade-btn" style="background: linear-gradient(135deg, #667eea, #764ba2);" onclick="logout()">
-                🚪 Logout
-            </button>
+            {% if not premium %}
+            <button class="upgrade-btn" onclick="showUpgradeModal()">🚀 UPGRADE PREMIUM</button>
+            {% endif %}
+            <button class="upgrade-btn" style="background: linear-gradient(135deg, #667eea, #764ba2);" onclick="logout()">🚪 Logout</button>
         </div>
     </div>
 
@@ -927,88 +696,34 @@ CHAT_HTML = """
         </div>
         
         <div class="input-area">
-            <div id="filePreview" class="file-preview"></div>
             <div class="input-wrapper">
-                <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Carica immagine">
-                    📎
-                </button>
-                <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*" onchange="handleFileSelect(event)">
+                <button class="tool-btn" onclick="document.getElementById('fileInput').click()" title="Carica immagine">📎</button>
+                <input type="file" id="fileInput" style="display: none;" accept="image/*" multiple>
                 
-                <textarea id="input" placeholder="Scrivi un messaggio... (es: genera un'immagine di..., analizza questa foto, crea un video...)" 
+                <textarea id="input" placeholder="Scrivi un messaggio... (es: genera un'immagine di..., analizza questa foto...)" 
                     onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
                 
-                <button id="sendBtn" onclick="sendMessage()">
-                    ➤
-                </button>
+                <button id="sendBtn" onclick="sendMessage()">➤</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Upgrade Premium -->
     <div id="upgradeModal" class="modal">
         <div class="modal-content">
             <h2>🚀 Upgrade a Premium</h2>
-            <p style="margin-bottom: 20px; color: #aaa;">Sblocca tutte le funzionalità avanzate:</p>
-            <ul style="margin-bottom: 20px; color: #aaa; line-height: 2;">
-                <li>✨ Chat illimitate</li>
-                <li>🎨 Generazione immagini HD</li>
-                <li>🎥 Generazione video AI</li>
-                <li>👁️ Vision AI avanzata</li>
-                <li>⚡ Priorità nelle risposte</li>
-                <li>🔥 Modelli AI premium</li>
-            </ul>
-            <input type="text" id="licenseKey" placeholder="Inserisci la tua License Key Gumroad">
+            <p style="margin-bottom: 20px; color: #aaa;">Sblocca tutte le funzionalità avanzate</p>
+            <input type="text" id="licenseKey" placeholder="Inserisci License Key Gumroad">
             <div class="modal-buttons">
                 <button class="modal-btn secondary" onclick="closeUpgradeModal()">Chiudi</button>
                 <button class="modal-btn primary" onclick="activateLicense()">Attiva</button>
             </div>
-            <a href="${GUMROAD_PRODUCT_URL}" target="_blank" class="gumroad-link">
-                🛒 Acquista su Gumroad →
-            </a>
         </div>
     </div>
 
     <script>
         let selectedFiles = [];
         let currentChatId = Date.now();
-        let chatHistory = {};
         
-        // Inizializzazione
-        document.addEventListener('DOMContentLoaded', async () => {
-            await checkAuth();
-            loadChatHistory();
-            adjustTextareaHeight();
-        });
-
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/user');
-                if (res.ok) {
-                    const user = await res.json();
-                    updateUserUI(user);
-                } else {
-                    window.location.href = '/login';
-                }
-            } catch (e) {
-                console.error('Auth check failed:', e);
-            }
-        }
-
-        function updateUserUI(user) {
-            document.getElementById('username').textContent = user.username;
-            document.getElementById('userAvatar').textContent = user.username[0].toUpperCase();
-            
-            if (user.premium) {
-                document.getElementById('planBadge').innerHTML = '<span class="premium-badge">⭐ PREMIUM</span>';
-                document.querySelector('.upgrade-btn').textContent = '✅ Premium Attivo';
-                document.querySelector('.upgrade-btn').style.background = 'linear-gradient(135deg, #00C851, #007E33)';
-            }
-        }
-
-        function toggleSidebar() {
-            document.querySelector('.sidebar').classList.toggle('open');
-        }
-
         function newChat() {
             currentChatId = Date.now();
             document.getElementById('chat').innerHTML = `
@@ -1020,57 +735,6 @@ CHAT_HTML = """
             `;
             document.getElementById('input').value = '';
             selectedFiles = [];
-            updateFilePreview();
-        }
-
-        function loadChatHistory() {
-            const history = Object.keys(chatHistory).sort((a, b) => b - a);
-            const html = history.map(id => `
-                <div class="chat-item" onclick="loadChat(${id})">
-                    <div style="font-size: 13px; color: #888;">${new Date(parseInt(id)).toLocaleDateString()}</div>
-                    <div style="margin-top: 4px; font-size: 14px;">Chat ${id}</div>
-                </div>
-            `).join('');
-            document.getElementById('chatHistory').innerHTML = html || '<div style="padding: 12px; color: #666; text-align: center;">Nessuna chat</div>';
-        }
-
-        function loadChat(id) {
-            currentChatId = id;
-            const messages = chatHistory[id] || [];
-            const chat = document.getElementById('chat');
-            chat.innerHTML = '';
-            messages.forEach(msg => addMessageToUI(msg.role, msg.content, msg.type));
-        }
-
-        function handleFileSelect(event) {
-            const files = Array.from(event.target.files);
-            selectedFiles = [...selectedFiles, ...files].slice(0, 5); // Max 5 files
-            updateFilePreview();
-        }
-
-        function updateFilePreview() {
-            const preview = document.getElementById('filePreview');
-            if (selectedFiles.length === 0) {
-                preview.innerHTML = '';
-                return;
-            }
-            
-            preview.innerHTML = selectedFiles.map((file, index) => {
-                const url = URL.createObjectURL(file);
-                const isVideo = file.type.startsWith('video/');
-                const tag = isVideo ? `<video src="${url}" autoplay muted loop></video>` : `<img src="${url}">`;
-                return `
-                    <div class="preview-item">
-                        ${tag}
-                        <button class="preview-remove" onclick="removeFile(${index})">×</button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function removeFile(index) {
-            selectedFiles.splice(index, 1);
-            updateFilePreview();
         }
 
         async function sendMessage() {
@@ -1079,90 +743,61 @@ CHAT_HTML = """
             
             if (!text && selectedFiles.length === 0) return;
             
-            // Disabilita input
             input.disabled = true;
             document.getElementById('sendBtn').disabled = true;
             
-            // Rimuovi welcome se presente
             const welcome = document.querySelector('.welcome');
             if (welcome) welcome.remove();
             
-            // Aggiungi messaggio utente
             addMessageToUI('user', text);
             input.value = '';
-            adjustTextareaHeight();
-            
-            // Determina il tipo di richiesta
-            let requestType = 'chat';
-            const lowerText = text.toLowerCase();
-            
-            if (lowerText.includes('genera') && (lowerText.includes('immagine') || lowerText.includes('foto') || lowerText.includes('disegno'))) {
-                requestType = 'image';
-            } else if (lowerText.includes('genera') && lowerText.includes('video')) {
-                requestType = 'video';
-            } else if (selectedFiles.length > 0) {
-                requestType = 'vision';
-            }
             
             try {
-                // Invia richiesta
                 const formData = new FormData();
                 formData.append('message', text);
+                
+                let requestType = 'chat';
+                const lowerText = text.toLowerCase();
+                
+                if (lowerText.includes('genera') && (lowerText.includes('immagine') || lowerText.includes('foto'))) {
+                    requestType = 'image';
+                } else if (selectedFiles.length > 0) {
+                    requestType = 'vision';
+                    selectedFiles.forEach(file => formData.append('files', file));
+                }
+                
                 formData.append('type', requestType);
-                selectedFiles.forEach(file => formData.append('files', file));
                 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     body: formData
                 });
                 
-                if (!response.ok) {
-                    throw new Error('Errore nella richiesta');
-                }
-                
                 const data = await response.json();
                 
-                // Aggiungi risposta
                 if (data.error) {
                     addMessageToUI('bot', `❌ ${data.error}`);
                 } else {
-                    addMessageToUI('bot', data.response, data.type, data.media);
+                    addMessageToUI('bot', data.response, data.media);
                 }
-                
-                // Salva in history
-                if (!chatHistory[currentChatId]) {
-                    chatHistory[currentChatId] = [];
-                }
-                chatHistory[currentChatId].push(
-                    { role: 'user', content: text },
-                    { role: 'bot', content: data.response, type: data.type, media: data.media }
-                );
-                loadChatHistory();
                 
             } catch (error) {
-                console.error('Error:', error);
-                addMessageToUI('bot', '❌ Si è verificato un errore. Riprova.');
+                addMessageToUI('bot', '❌ Errore: ' + error.message);
             } finally {
-                // Riabilita input
                 input.disabled = false;
                 document.getElementById('sendBtn').disabled = false;
                 input.focus();
                 selectedFiles = [];
-                updateFilePreview();
             }
         }
 
-        function addMessageToUI(role, content, type = 'text', media = null) {
+        function addMessageToUI(role, content, media = null) {
             const chat = document.getElementById('chat');
             const isBot = role === 'bot';
             
             let mediaHtml = '';
             if (media) {
-                if (type === 'image') {
-                    mediaHtml = `<img src="${media}" alt="Generated image" style="max-width: 100%; border-radius: 12px; margin-top: 12px;">`;
-                } else if (type === 'video') {
-                    mediaHtml = `<video src="${media}" controls style="max-width: 100%; border-radius: 12px; margin-top: 12px;"></video>`;
-                }
+                mediaHtml = `<img src="${media}" alt="Generated" style="max-width: 100%; border-radius: 12px; margin-top: 12px;">`;
             }
             
             const messageDiv = document.createElement('div');
@@ -1179,13 +814,9 @@ CHAT_HTML = """
             chat.scrollTop = chat.scrollHeight;
         }
 
-        function adjustTextareaHeight() {
-            const textarea = document.getElementById('input');
-            textarea.style.height = 'auto';
-            textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-        }
-
-        document.getElementById('input').addEventListener('input', adjustTextareaHeight);
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files).slice(0, 5);
+        });
 
         function showUpgradeModal() {
             document.getElementById('upgradeModal').classList.add('show');
@@ -1229,11 +860,10 @@ CHAT_HTML = """
                 await fetch('/api/logout', { method: 'POST' });
                 window.location.href = '/login';
             } catch (e) {
-                console.error('Logout failed:', e);
+                window.location.href = '/login';
             }
         }
 
-        // Auto-resize textarea
         document.getElementById('input').addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 200) + 'px';
@@ -1242,20 +872,6 @@ CHAT_HTML = """
 </body>
 </html>
 """
-
-# ============================================
-# ROUTES
-# ============================================
-
-@app.route("/")
-def index():
-    if "username" not in session:
-        return render_template_string(LOGIN_HTML)
-    return render_template_string(CHAT_HTML)
-
-@app.route("/login")
-def login_page():
-    return render_template_string(LOGIN_HTML)
 
 LOGIN_HTML = """
 <!DOCTYPE html>
@@ -1533,7 +1149,9 @@ LOGIN_HTML = """
                 
                 if (data.success) {
                     showMessage('✅ Account creato! Accedi ora.', 'success');
-                    setTimeout(() => switchTab('login'), 2000);
+                    setTimeout(() => {
+                        document.querySelector('.tab:first-child').click();
+                    }, 2000);
                 } else {
                     showMessage('❌ ' + data.message, 'error');
                 }
@@ -1545,6 +1163,26 @@ LOGIN_HTML = """
 </body>
 </html>
 """
+
+# ============================================
+# ROUTES
+# ============================================
+
+@app.route("/")
+def index():
+    if "username" not in session:
+        return render_template_string(LOGIN_HTML)
+    
+    user = get_current_user()
+    return render_template_string(
+        CHAT_HTML, 
+        username=user.get("username", "User"),
+        premium=user.get("premium", False)
+    )
+
+@app.route("/login")
+def login_page():
+    return render_template_string(LOGIN_HTML)
 
 @app.route("/api/register", methods=["POST"])
 def register():
@@ -1604,43 +1242,26 @@ def logout():
     session.clear()
     return jsonify({"success": True})
 
-@app.route("/api/user")
-@login_required
-def get_user():
-    user = get_user()
-    if user:
-        return jsonify({
-            "username": user["username"],
-            "email": user.get("email", ""),
-            "premium": user.get("premium", False),
-            "chat_count": user.get("chat_count", 0)
-        })
-    return jsonify({"error": "User not found"}), 404
-
 @app.route("/api/chat", methods=["POST"])
 @login_required
 def chat():
     try:
-        user = get_user()
+        user = get_current_user()
         message = request.form.get("message", "").strip()
         request_type = request.form.get("type", "chat")
         
-        # Controllo limiti free
         if not user.get("premium", False):
             today_count = user.get("chat_count", 0)
-            if today_count >= 50:  # Limite free: 50 messaggi/giorno
+            if today_count >= 50:
                 return jsonify({
                     "error": "Hai raggiunto il limite giornaliero. Passa a Premium per chat illimitate!",
                     "upgrade": True
                 })
         
-        # Incrementa contatore
         user["chat_count"] = user.get("chat_count", 0) + 1
         save_db()
         
-        # Gestisci diversi tipi di richiesta
         if request_type == "image":
-            # Generazione immagine
             result = generate_image_stability(message)
             return jsonify({
                 "success": True,
@@ -1649,24 +1270,7 @@ def chat():
                 "media": result["url"]
             })
         
-        elif request_type == "video":
-            # Generazione video
-            result = generate_video_replicate(message)
-            if result.get("demo"):
-                return jsonify({
-                    "success": True,
-                    "response": "🎥 La generazione video sarà disponibile a breve. Nel frattempo, prova a generare immagini!",
-                    "type": "text"
-                })
-            return jsonify({
-                "success": True,
-                "response": "🎥 Video generato con successo!",
-                "type": "video",
-                "media": result.get("url")
-            })
-        
         elif request_type == "vision" and request.files:
-            # Analisi immagine
             file = request.files.getlist("files")[0]
             filename = f"upload_{secrets.token_hex(8)}.{file.filename.split('.')[-1]}"
             filepath = os.path.join("static/uploads", filename)
@@ -1681,31 +1285,25 @@ def chat():
             })
         
         else:
-            # Chat normale con Groq AI
             messages = [
                 {
                     "role": "system",
                     "content": """Sei NEXUS, l'assistente AI più potente e avanzato al mondo. 
                     
-Caratteristiche principali:
+Caratteristiche:
 - Ultra-veloce e intelligente
 - Esperto in programmazione, matematica, scienza, arte, scrittura
 - Creativo e innovativo
 - Amichevole ma professionale
-- Dai risposte dettagliate e utili
-- Puoi generare immagini, video e analizzare contenuti
-- Supporti multilingua automatico
 
 Capacità speciali:
-🎨 Generazione immagini HD con Stable Diffusion
-🎥 Generazione video con AI
+🎨 Generazione immagini HD
 👁️ Analisi immagini avanzata
 💻 Programmazione in tutti i linguaggi
 📊 Analisi dati e visualizzazioni
-✍️ Scrittura creativa e contenuti
-🔬 Ricerca e problem solving
+✍️ Scrittura creativa
 
-Rispondi sempre in modo chiaro, completo e coinvolgente. Se l'utente chiede di generare immagini o video, guidalo su come fare."""
+Rispondi sempre in modo chiaro, completo e coinvolgente."""
                 },
                 {
                     "role": "user",
@@ -1713,9 +1311,7 @@ Rispondi sempre in modo chiaro, completo e coinvolgente. Se l'utente chiede di g
                 }
             ]
             
-            # Scegli il modello in base al piano
             model = "llama-3.3-70b-versatile" if user.get("premium") else "llama-3.1-70b-versatile"
-            
             response = call_groq(messages, model)
             
             return jsonify({
@@ -1727,8 +1323,7 @@ Rispondi sempre in modo chiaro, completo e coinvolgente. Se l'utente chiede di g
     except Exception as e:
         print(f"Chat error: {e}")
         return jsonify({
-            "error": "Si è verificato un errore. Riprova.",
-            "details": str(e)
+            "error": f"Errore: {str(e)}"
         }), 500
 
 @app.route("/api/activate-premium", methods=["POST"])
@@ -1741,22 +1336,18 @@ def activate_premium():
         if not license_key:
             return jsonify({"success": False, "message": "License key mancante"})
         
-        # Verifica se già usata
         if license_key in USED_LICENSES:
             return jsonify({"success": False, "message": "Questa license key è già stata utilizzata"})
         
-        user = get_user()
+        user = get_current_user()
         
-        # Verifica con Gumroad
         result = verify_gumroad_license(license_key, user.get("email", ""))
         
         if result.get("success"):
-            # Attiva premium
             user["premium"] = True
             user["premium_activated_at"] = datetime.utcnow().isoformat()
             user["license_key"] = license_key
             
-            # Marca license come usata
             USED_LICENSES.add(license_key)
             PREMIUM_LICENSES[license_key] = {
                 "username": user["username"],
@@ -1783,279 +1374,6 @@ def activate_premium():
         }), 500
 
 # ============================================
-# FUNZIONALITÀ AVANZATE
-# ============================================
-
-@app.route("/api/models", methods=["GET"])
-@login_required
-def get_models():
-    """Lista modelli AI disponibili"""
-    user = get_user()
-    is_premium = user.get("premium", False)
-    
-    models = [
-        {
-            "id": "llama-3.1-70b-versatile",
-            "name": "Llama 3.1 70B",
-            "description": "Modello veloce e versatile",
-            "free": True
-        },
-        {
-            "id": "llama-3.3-70b-versatile",
-            "name": "Llama 3.3 70B",
-            "description": "Modello più avanzato e accurato",
-            "free": False,
-            "premium_only": True
-        },
-        {
-            "id": "mixtral-8x7b-32768",
-            "name": "Mixtral 8x7B",
-            "description": "Eccellente per coding e analisi",
-            "free": False,
-            "premium_only": True
-        }
-    ]
-    
-    # Filtra modelli in base al piano
-    if not is_premium:
-        models = [m for m in models if m.get("free", False)]
-    
-    return jsonify({"models": models})
-
-@app.route("/api/stats", methods=["GET"])
-@login_required
-def get_stats():
-    """Statistiche utente"""
-    user = get_user()
-    
-    return jsonify({
-        "username": user["username"],
-        "premium": user.get("premium", False),
-        "chat_count": user.get("chat_count", 0),
-        "member_since": user.get("created_at", ""),
-        "total_users": len(USERS),
-        "premium_users": sum(1 for u in USERS.values() if u.get("premium", False))
-    })
-
-@app.route("/api/export-chat", methods=["POST"])
-@login_required
-def export_chat():
-    """Esporta chat in formato JSON/TXT"""
-    try:
-        data = request.json
-        chat_id = data.get("chat_id")
-        format_type = data.get("format", "txt")  # txt o json
-        
-        # Implementazione export...
-        return jsonify({
-            "success": True,
-            "message": "Chat esportata"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/feedback", methods=["POST"])
-@login_required
-def submit_feedback():
-    """Raccogli feedback dagli utenti"""
-    try:
-        data = request.json
-        feedback = data.get("feedback", "")
-        rating = data.get("rating", 0)
-        
-        user = get_user()
-        
-        # Salva feedback in un file separato
-        feedback_data = {
-            "username": user["username"],
-            "feedback": feedback,
-            "rating": rating,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        feedback_file = "feedback.json"
-        feedbacks = []
-        
-        if os.path.exists(feedback_file):
-            with open(feedback_file, "r") as f:
-                feedbacks = json.load(f)
-        
-        feedbacks.append(feedback_data)
-        
-        with open(feedback_file, "w") as f:
-            json.dump(feedbacks, f, indent=2)
-        
-        return jsonify({
-            "success": True,
-            "message": "Grazie per il tuo feedback!"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ============================================
-# WEBHOOK GUMROAD (Attivazione automatica)
-# ============================================
-
-@app.route("/webhook/gumroad", methods=["POST"])
-def gumroad_webhook():
-    """Webhook per attivare automaticamente Premium dopo acquisto"""
-    try:
-        # Verifica signature
-        signature = request.headers.get("X-Gumroad-Signature")
-        payload = request.get_data()
-        
-        # In produzione, verifica la firma HMAC
-        # expected_signature = hmac.new(
-        #     GUMROAD_WEBHOOK_SECRET.encode(),
-        #     payload,
-        #     hashlib.sha256
-        # ).hexdigest()
-        
-        data = request.form
-        
-        # Estrai dati
-        email = data.get("email")
-        license_key = data.get("license_key")
-        product_id = data.get("product_id")
-        
-        if license_key and email:
-            # Trova utente per email
-            user_found = None
-            username_found = None
-            
-            for username, user_data in USERS.items():
-                if user_data.get("email") == email:
-                    user_found = user_data
-                    username_found = username
-                    break
-            
-            if user_found:
-                # Attiva premium automaticamente
-                user_found["premium"] = True
-                user_found["premium_activated_at"] = datetime.utcnow().isoformat()
-                user_found["license_key"] = license_key
-                
-                USED_LICENSES.add(license_key)
-                PREMIUM_LICENSES[license_key] = {
-                    "username": username_found,
-                    "email": email,
-                    "activated_at": datetime.utcnow().isoformat(),
-                    "auto_activated": True
-                }
-                
-                save_db()
-                
-                print(f"✅ Premium auto-attivato per {username_found}")
-        
-        return jsonify({"success": True}), 200
-    
-    except Exception as e:
-        print(f"Webhook error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# ============================================
-# ADMIN PANEL (Opzionale)
-# ============================================
-
-@app.route("/admin")
-def admin_panel():
-    """Pannello admin per gestire utenti e licenze"""
-    if session.get("username") != "admin":  # Cambia con il tuo username admin
-        return "Accesso negato", 403
-    
-    stats = {
-        "total_users": len(USERS),
-        "premium_users": sum(1 for u in USERS.values() if u.get("premium", False)),
-        "total_licenses": len(PREMIUM_LICENSES),
-        "used_licenses": len(USED_LICENSES)
-    }
-    
-    return jsonify(stats)
-
-# ============================================
-# STRATEGIE DI INTEGRAZIONE AVANZATE
-# ============================================
-
-"""
-🚀 STRATEGIE DI INTEGRAZIONE PER NEXUS AI
-
-1. **INTEGRAZIONE API MULTIPLE**
-   - Groq AI per chat ultra-veloce
-   - Stability AI per immagini HD
-   - Replicate per video generation
-   - Vision AI per analisi immagini
-   - Gumroad per pagamenti
-
-2. **SISTEMA DI AUTENTICAZIONE ROBUSTO**
-   - Bcrypt per password sicure
-   - Session management con Flask
-   - Protezione CSRF
-   - Rate limiting
-
-3. **GESTIONE UTENTI E PIANI**
-   - Piano Free con limiti
-   - Piano Premium illimitato
-   - Verifica licenze Gumroad
-   - Webhook per attivazione automatica
-
-4. **MULTIMODALITÀ AVANZATA**
-   - Chat testuale
-   - Generazione immagini
-   - Generazione video
-   - Analisi immagini con Vision
-   - Upload e preview file
-
-5. **UI/UX MODERNA**
-   - Design gradiente animato
-   - Responsive mobile-first
-   - Animazioni fluide
-   - Dark mode professionale
-   - Preview file in tempo reale
-
-6. **SCALABILITÀ**
-   - Database JSON (facile upgrade a SQL)
-   - Struttura modulare
-   - API RESTful
-   - Webhook per integrazioni
-
-7. **MONETIZZAZIONE**
-   - Integrazione Gumroad nativa
-   - Licenze verificabili
-   - Upgrade modal integrato
-   - Tracking utilizzo
-
-8. **FEATURES PREMIUM**
-   - Modelli AI avanzati
-   - Chat illimitate
-   - Generazione HD
-   - Priorità nelle risposte
-   - Supporto prioritario
-
-9. **SICUREZZA**
-   - Password hashing
-   - Session security
-   - Input sanitization
-   - Error handling
-   - Rate limiting
-
-10. **ANALYTICS E FEEDBACK**
-    - Tracking utilizzo
-    - Sistema feedback
-    - Statistiche utente
-    - Export chat
-    - Admin panel
-
-PROSSIMI STEP:
-- Aggiungere Redis per caching
-- Implementare WebSocket per real-time
-- Integrare più modelli AI
-- Sistema di referral
-- Mobile app con React Native
-- Plugin Chrome extension
-- API pubblica per developers
-"""
-
-# ============================================
 # AVVIO APP
 # ============================================
 
@@ -2065,12 +1383,9 @@ if __name__ == "__main__":
     print("="*60)
     print(f"✅ Groq AI: {'ATTIVO' if groq_client else 'NON CONFIGURATO'}")
     print(f"✅ Stability API: {'ATTIVO' if STABILITY_API_KEY else 'DEMO MODE'}")
-    print(f"✅ Replicate API: {'ATTIVO' if REPLICATE_API_KEY else 'IN ARRIVO'}")
-    print(f"✅ Gumroad: {'ATTIVO' if GUMROAD_LICENSE_KEY else 'NON CONFIGURATO'}")
     print(f"\n📊 Utenti registrati: {len(USERS)}")
     print(f"💎 Utenti Premium: {sum(1 for u in USERS.values() if u.get('premium', False))}")
     print("\n🌐 Server avviato su: http://127.0.0.1:5000")
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
-        
