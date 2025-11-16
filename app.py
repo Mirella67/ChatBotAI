@@ -1052,30 +1052,30 @@ CHAT_HTML = """
             
             <!-- PAYMENT FORM -->
             <div id="paymentForm" style="display:none;">
-                <h3 style="color:#ececf1;margin:1rem 0;">Payment Method</h3>
+                <h3 style="color:#ececf1;margin:1rem 0;">💳 Payment Method</h3>
                 <div style="background:#2a2b32;padding:1.5rem;border-radius:12px;margin:1rem 0;">
                     <p style="color:#8e8ea0;font-size:0.9rem;margin-bottom:1rem;">
-                        💳 Secure payment powered by Stripe
+                        🔒 Secure payment powered by Stripe
                     </p>
-                    <input type="text" placeholder="Card Number" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                    <input type="text" id="cardNumber" placeholder="Card Number (e.g., 4242 4242 4242 4242)" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#40414f;color:#ececf1;font-size:14px;">
                     <div style="display:flex;gap:0.5rem;">
-                        <input type="text" placeholder="MM/YY" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
-                        <input type="text" placeholder="CVC" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                        <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#40414f;color:#ececf1;font-size:14px;">
+                        <input type="text" id="cardCvc" placeholder="CVC" maxlength="3" style="flex:1;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#40414f;color:#ececf1;font-size:14px;">
                     </div>
-                    <input type="text" placeholder="Cardholder Name" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#2a2b32;color:#ececf1;">
+                    <input type="text" id="cardName" placeholder="Cardholder Name" style="width:100%;padding:0.75rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:#40414f;color:#ececf1;font-size:14px;">
                     
                     <div style="margin-top:1rem;padding:1rem;background:rgba(25,195,125,0.1);border-radius:8px;border:1px solid #19c37d;">
-                        <strong style="color:#19c37d;">Total: €15.00/month</strong>
+                        <strong style="color:#19c37d;font-size:1.1rem;">Total: €15.00/month</strong>
                         <p style="font-size:0.85rem;color:#8e8ea0;margin-top:0.5rem;">
-                            Cancel anytime. Your subscription renews automatically.
+                            ✓ Cancel anytime • Renews automatically • 24/7 support
                         </p>
                     </div>
                     
-                    <button onclick="processPayment()" style="width:100%;padding:1rem;margin-top:1rem;background:#19c37d;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
-                        Subscribe for €15/month
+                    <button onclick="processPayment()" style="width:100%;padding:1rem;margin-top:1rem;background:#19c37d;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:15px;transition:all 0.2s;">
+                        🚀 Subscribe for €15/month
                     </button>
-                    <button onclick="hidePaymentForm()" style="width:100%;padding:0.75rem;margin-top:0.5rem;background:transparent;border:1px solid rgba(255,255,255,0.2);color:#ececf1;border-radius:8px;cursor:pointer;">
-                        Back
+                    <button onclick="hidePaymentForm()" style="width:100%;padding:0.75rem;margin-top:0.5rem;background:transparent;border:1px solid rgba(255,255,255,0.2);color:#ececf1;border-radius:8px;cursor:pointer;font-size:14px;">
+                        ← Back
                     </button>
                 </div>
             </div>
@@ -1192,15 +1192,53 @@ CHAT_HTML = """
         
         function showPremium() {
             document.getElementById('premiumModal').classList.add('active');
+            document.getElementById('paymentForm').style.display = 'none';
+            document.getElementById('codeInput').style.display = 'none';
         }
         
         function hidePremium() {
             document.getElementById('premiumModal').classList.remove('active');
             document.getElementById('codeInput').style.display = 'none';
+            document.getElementById('paymentForm').style.display = 'none';
+        }
+        
+        function showPaymentForm() {
+            document.getElementById('paymentForm').style.display = 'block';
+        }
+        
+        function hidePaymentForm() {
+            document.getElementById('paymentForm').style.display = 'none';
         }
         
         function showCodeInput() {
             document.getElementById('codeInput').style.display = 'block';
+            document.getElementById('paymentForm').style.display = 'none';
+        }
+        
+        async function processPayment() {
+            // Simulazione pagamento - In produzione integrerai Stripe
+            alert('🔄 Processing payment...\n\nNote: This is a demo. In production, this will integrate with Stripe for real payments.\n\nFor now, use a premium code or contact support.');
+            
+            // In produzione, qui faresti la chiamata a Stripe:
+            /*
+            const stripe = Stripe('your_publishable_key');
+            const {error, paymentIntent} = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: { name: cardholderName }
+                }
+            });
+            
+            if (!error) {
+                // Attiva premium sul backend
+                await fetch('/activate-premium', {
+                    method: 'POST',
+                    body: JSON.stringify({paymentIntentId: paymentIntent.id})
+                });
+                alert('✅ Premium activated!');
+                location.reload();
+            }
+            */
         }
         
         async function redeemCode() {
