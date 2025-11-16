@@ -665,7 +665,7 @@ CHAT_HTML = """
             <p style="margin-bottom: 20px; color: #aaa;">Sblocca chat illimitate e funzionalità avanzate</p>
             
             <div style="background: rgba(102,126,234,0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-                <h3 style="font-size: 20px; margin-bottom: 12px;">💎 Piano Premium - €9.99/mese</h3>
+                <h3 style="font-size: 20px; margin-bottom: 12px;">💎 Piano Premium - €15/mese</h3>
                 <ul style="color: #aaa; line-height: 2; margin-left: 20px;">
                     <li>✨ Chat illimitate</li>
                     <li>🎨 Generazione immagini HD illimitata</li>
@@ -1398,4 +1398,3 @@ if __name__ == "__main__":
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
-
