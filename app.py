@@ -29,7 +29,7 @@ try:
     HAS_PYTZ = True
 except ImportError:
     HAS_PYTZ = False
-    print("⚠️ pip install pytz")
+    print("⚠️ pip install pytz (opzionale per timezone)")
 
 # ============================================
 # CONFIGURAZIONE
@@ -517,6 +517,173 @@ CHAT_HTML = """
             color: #888;
         }
         
+        /* RESPONSIVE MOBILE */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                height: 100vh;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+            
+            .sidebar.open {
+                left: 0;
+            }
+            
+            .main {
+                width: 100%;
+            }
+            
+            .mobile-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 16px 20px;
+                background: rgba(10,10,10,0.95);
+                border-bottom: 1px solid rgba(102,126,234,0.2);
+                backdrop-filter: blur(20px);
+                position: sticky;
+                top: 0;
+                z-index: 999;
+            }
+            
+            .menu-btn {
+                background: rgba(102,126,234,0.2);
+                border: 1px solid rgba(102,126,234,0.3);
+                border-radius: 10px;
+                color: #fff;
+                font-size: 24px;
+                width: 45px;
+                height: 45px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .mobile-title {
+                font-size: 18px;
+                font-weight: 700;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            
+            .chat {
+                padding: 16px;
+                height: calc(100vh - 200px);
+            }
+            
+            .welcome {
+                padding: 20px;
+            }
+            
+            .welcome-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 40px;
+                margin-bottom: 20px;
+            }
+            
+            .welcome h1 {
+                font-size: 32px;
+            }
+            
+            .welcome p {
+                font-size: 16px;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .message {
+                margin-bottom: 16px;
+            }
+            
+            .msg-avatar {
+                width: 35px;
+                height: 35px;
+                font-size: 18px;
+            }
+            
+            .bubble {
+                padding: 12px 16px;
+                font-size: 15px;
+            }
+            
+            .input-area {
+                padding: 12px;
+            }
+            
+            .input-wrapper {
+                gap: 8px;
+            }
+            
+            .tool-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }
+            
+            #input {
+                font-size: 16px; /* Prevent zoom on iOS */
+                padding: 12px 14px;
+                min-height: 45px;
+            }
+            
+            #sendBtn {
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }
+            
+            .modal-content {
+                margin: 20px;
+                padding: 30px 25px;
+                max-width: calc(100% - 40px);
+            }
+            
+            .modal-content h2 {
+                font-size: 24px;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-header {
+                display: none;
+            }
+        }
+        
+        /* Overlay per mobile quando sidebar è aperta */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }
+        
+        .sidebar-overlay.show {
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar-overlay.show {
+                display: block;
+            }
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -592,7 +759,17 @@ CHAT_HTML = """
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <!-- Header Mobile -->
+    <div class="mobile-header">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="mobile-title">⚡ NEXUS AI</div>
+        <div style="width: 45px;"></div>
+    </div>
+    
+    <!-- Overlay per chiudere sidebar su mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="logo">
             <h1>⚡ NEXUS</h1>
             <p>ULTIMATE AI ASSISTANT</p>
@@ -793,6 +970,11 @@ CHAT_HTML = """
                 addMessageToUI(msg.role, msg.content, msg.media);
                 currentChatMessages.push(msg);
             });
+            
+            // Chiudi sidebar su mobile dopo aver selezionato una chat
+            if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
         }
 
         function newChat() {
@@ -812,6 +994,15 @@ CHAT_HTML = """
             `;
             document.getElementById('input').value = '';
             selectedFile = null;
+            
+            // Chiudi sidebar su mobile
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                if (sidebar.classList.contains('open')) {
+                    toggleSidebar();
+                }
+            }
         }
         
         async function saveCurrentChat() {
@@ -1454,26 +1645,17 @@ def chat():
         
         else:
             # Ottieni data e ora corrente
-            from datetime import datetime
-            import pytz
-            
-            now_utc = datetime.utcnow()
-            italy_tz = pytz.timezone('Europe/Rome')
-            now_italy = now_utc.replace(tzinfo=pytz.utc).astimezone(italy_tz)
+            try:
+                import pytz
+                now_utc = datetime.utcnow()
+                italy_tz = pytz.timezone('Europe/Rome')
+                now_italy = now_utc.replace(tzinfo=pytz.utc).astimezone(italy_tz)
+            except:
+                # Fallback se pytz non è installato
+                now_italy = datetime.utcnow()
             
             current_date = now_italy.strftime("%A, %d %B %Y")
             current_time = now_italy.strftime("%H:%M")
-            
-            # Traduci il giorno in italiano se necessario
-            days_it = {
-                'Monday': 'Lunedì', 'Tuesday': 'Martedì', 'Wednesday': 'Mercoledì',
-                'Thursday': 'Giovedì', 'Friday': 'Venerdì', 'Saturday': 'Sabato', 'Sunday': 'Domenica'
-            }
-            months_it = {
-                'January': 'Gennaio', 'February': 'Febbraio', 'March': 'Marzo', 'April': 'Aprile',
-                'May': 'Maggio', 'June': 'Giugno', 'July': 'Luglio', 'August': 'Agosto',
-                'September': 'Settembre', 'October': 'Ottobre', 'November': 'Novembre', 'December': 'Dicembre'
-            }
             
             messages = [
                 {
@@ -1649,7 +1831,9 @@ if __name__ == "__main__":
     print("   6. Genera immagini: 'genera/generate un'immagine di...' 🎨")
     print("   7. Analizza foto: clicca 📎 e carica immagine 👁️")
     print("   8. Premium €15/mese: usa 'PREMIUM-TEST123' per test")
-    print("\n📦 Installa: pip install flask groq bcrypt requests pytz")
+    print("   9. RESPONSIVE: funziona perfettamente su PC e Mobile! 📱💻")
+    print("\n📦 Installa: pip install flask groq bcrypt requests")
+    print("   Opzionale: pip install pytz (per timezone Italia)")
     print("="*60 + "\n")
     
     app.run(debug=True, host="0.0.0.0", port=5000)
