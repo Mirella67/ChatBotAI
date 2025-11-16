@@ -1,0 +1,91 @@
+# TEST: Salva questo file come test_simple.html e aprilo nel browser
+# Questo ti mostra se il problema è nel codice Python o nel JavaScript
+
+html_test = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Buttons</title>
+    <style>
+        body { font-family: Arial; padding: 2rem; background: #343541; color: white; }
+        button { 
+            padding: 1rem 2rem; 
+            margin: 1rem; 
+            font-size: 16px; 
+            cursor: pointer;
+            background: #19c37d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+        }
+        button:hover { background: #15a76a; }
+        #output { margin-top: 2rem; padding: 1rem; background: #444; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 EMI BOT - Button Test</h1>
+    <p>Se questi pulsanti funzionano, il problema è nel codice Python.</p>
+    
+    <button onclick="testClick()">✅ Test Click</button>
+    <button onclick="testMessage()">💬 Test Message</button>
+    <button onclick="testFile()">📷 Test File</button>
+    <button onclick="testGenerate()">🎨 Test Generate</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function testClick() {
+            output.innerHTML += '<p>✅ Button clicked successfully!</p>';
+            console.log('Button works!');
+        }
+        
+        function testMessage() {
+            const msg = prompt('Enter a message:');
+            if (msg) {
+                output.innerHTML += `<p>💬 Message: ${msg}</p>`;
+            }
+        }
+        
+        function testFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    output.innerHTML += `<p>📷 File selected: ${file.name}</p>`;
+                }
+            };
+            input.click();
+        }
+        
+        function testGenerate() {
+            const prompt = window.prompt('Describe image:');
+            if (prompt) {
+                output.innerHTML += `<p>🎨 Generate: ${prompt}</p>`;
+            }
+        }
+        
+        // Test al caricamento
+        window.onload = () => {
+            output.innerHTML = '<p>✅ JavaScript loaded successfully!</p>';
+        };
+    </script>
+</body>
+</html>
+"""
+
+# Salva questo in un file e aprilo
+with open('test_simple.html', 'w', encoding='utf-8') as f:
+    f.write(html_test)
+
+print("✅ File test_simple.html creato!")
+print("📂 Aprilo nel browser per testare i pulsanti")
+print("") 
+print("Se i pulsanti funzionano nel file test:")
+print("  → Il problema è nel codice Flask")
+print("")  
+print("Se i pulsanti NON funzionano nel file test:")
+print("  → Il problema è nel browser/JavaScript")
