@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: nexus-ai
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn nexus:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: GROQ_API_KEY
+        sync: false
+```
+
+## 3. **Procfile** (alternativo)
+```
+web: gunicorn nexus:app
+```
+
+## 4. **runtime.txt** (specifica versione Python)
+```
+python-3.11.0
+```
+
+## 5. **.gitignore**
+```
+__pycache__/
+*.pyc
+nexus_data.json
+static/uploads/*
+static/generated/*
+.env
