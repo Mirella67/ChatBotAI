@@ -202,20 +202,20 @@ def detect_language(text):
     
     return max(scores, key=scores.get) if max(scores.values()) > 0 else "it"
 
-def call_groq(messages, model="llama-3.1-70b-versatile"):
+def call_groq(messages, model="llama-3.1-8b-instant"):
     if not groq_client:
-        return "⚠️ AI non configurata"
+        return "⚠️ AI non configurata. Installa: pip install groq"
     try:
         resp = groq_client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=8000,
+            max_tokens=4096,
             temperature=0.9,
             top_p=0.95
         )
         return resp.choices[0].message.content
     except Exception as e:
-        return f"Errore AI: {e}"
+        return f"Errore AI: {str(e)}"
 
 def gen_image(prompt):
     try:
@@ -264,7 +264,12 @@ LOGIN_HTML = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
     <title>NEXUS AI - Login</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: rgba(102, 126, 234, 0.2);
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
@@ -335,6 +340,8 @@ LOGIN_HTML = """<!DOCTYPE html>
             text-align: center;
             font-weight: 600;
             transition: all 0.3s;
+            touch-action: manipulation;
+            min-height: 44px;
         }
         .tab.active {
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -350,6 +357,10 @@ LOGIN_HTML = """<!DOCTYPE html>
             text-decoration: none;
             font-size: 14px;
             font-weight: 600;
+            display: inline-block;
+            padding: 8px;
+            min-height: 44px;
+            line-height: 28px;
         }
         .form input {
             width: 100%;
@@ -358,7 +369,7 @@ LOGIN_HTML = """<!DOCTYPE html>
             border: 1px solid rgba(102, 126, 234, 0.3);
             border-radius: 12px;
             color: #fff;
-            font-size: 15px;
+            font-size: 16px;
             margin-bottom: 15px;
         }
         .form input:focus {
@@ -376,10 +387,11 @@ LOGIN_HTML = """<!DOCTYPE html>
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
+            touch-action: manipulation;
+            min-height: 48px;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        .btn:active {
+            transform: scale(0.98);
         }
         .msg {
             padding: 12px;
@@ -401,6 +413,7 @@ LOGIN_HTML = """<!DOCTYPE html>
         @media (max-width: 600px) {
             .box { padding: 40px 25px; }
             .logo h1 { font-size: 28px; }
+            .logo-icon { width: 70px; height: 70px; font-size: 35px; }
         }
     </style>
 </head>
@@ -423,15 +436,15 @@ LOGIN_HTML = """<!DOCTYPE html>
         <div id="msg" class="msg"></div>
         
         <form id="loginForm" class="form" onsubmit="handleLogin(event); return false;">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
+            <input type="text" name="username" placeholder="Username" required autocomplete="username">
+            <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
             <button type="submit" class="btn">🚀 Accedi</button>
         </form>
         
         <form id="regForm" class="form" onsubmit="handleReg(event); return false;">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
+            <input type="text" name="username" placeholder="Username" required autocomplete="username">
+            <input type="email" name="email" placeholder="Email" required autocomplete="email">
+            <input type="password" name="password" placeholder="Password" required autocomplete="new-password">
             <button type="submit" class="btn">✨ Crea Account</button>
         </form>
     </div>
@@ -454,6 +467,10 @@ LOGIN_HTML = """<!DOCTYPE html>
         
         async function handleLogin(e) {
             e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = '⏳ Accesso...';
+            
             const fd = new FormData(e.target);
             try {
                 const r = await fetch('/api/login', {
@@ -467,14 +484,22 @@ LOGIN_HTML = """<!DOCTYPE html>
                     setTimeout(() => window.location.href = '/', 1000);
                 } else {
                     showMsg('❌ ' + d.msg, 'err');
+                    btn.disabled = false;
+                    btn.textContent = '🚀 Accedi';
                 }
             } catch (err) {
                 showMsg('❌ Errore connessione', 'err');
+                btn.disabled = false;
+                btn.textContent = '🚀 Accedi';
             }
         }
         
         async function handleReg(e) {
             e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = '⏳ Creazione...';
+            
             const fd = new FormData(e.target);
             try {
                 const r = await fetch('/api/register', {
@@ -488,9 +513,13 @@ LOGIN_HTML = """<!DOCTYPE html>
                     setTimeout(() => window.location.href = '/select-plan', 1500);
                 } else {
                     showMsg('❌ ' + d.msg, 'err');
+                    btn.disabled = false;
+                    btn.textContent = '✨ Crea Account';
                 }
             } catch (err) {
                 showMsg('❌ Errore connessione', 'err');
+                btn.disabled = false;
+                btn.textContent = '✨ Crea Account';
             }
         }
     </script>
@@ -1181,15 +1210,72 @@ CHAT_HTML = """<!DOCTYPE html>
         }
         @media (max-width: 768px) {
             .sidebar {
-                position: absolute;
+                position: fixed;
                 z-index: 1000;
-                height: 100%;
+                height: 100vh;
+                width: 280px;
+                left: 0;
+                top: 0;
             }
             .menu-toggle {
                 display: block;
             }
             .message {
-                max-width: 90%;
+                max-width: 95%;
+                font-size: 15px;
+            }
+            .header {
+                padding: 15px;
+            }
+            .header-title {
+                font-size: 14px;
+            }
+            .chat-area {
+                padding: 15px;
+            }
+            .input-area {
+                padding: 15px;
+            }
+            textarea {
+                font-size: 16px;
+                padding: 12px 45px 12px 12px;
+            }
+            .send-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            .file-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+            .video-container {
+                max-width: 100%;
+            }
+            /* Fix per tap su mobile */
+            button, .menu-item, .tab, a {
+                -webkit-tap-highlight-color: rgba(102, 126, 234, 0.2);
+                touch-action: manipulation;
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
+        @media (max-width: 480px) {
+            .message {
+                max-width: 98%;
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+            .logo-text {
+                font-size: 18px;
+            }
+            .user-info {
+                font-size: 12px;
+            }
+            .menu-item {
+                padding: 10px 12px;
+                font-size: 14px;
             }
         }
     </style>
@@ -1287,8 +1373,20 @@ CHAT_HTML = """<!DOCTYPE html>
         let currentFile = null;
         
         function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('hidden');
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
         }
+        
+        // Chiudi sidebar cliccando fuori su mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const toggle = document.querySelector('.menu-toggle');
+                if (!sidebar.contains(e.target) && e.target !== toggle && !sidebar.classList.contains('hidden')) {
+                    sidebar.classList.add('hidden');
+                }
+            }
+        });
         
         function newChat() {
             document.getElementById('chat').innerHTML = `
@@ -1296,6 +1394,9 @@ CHAT_HTML = """<!DOCTYPE html>
                     👋 Nuova chat iniziata! Come posso aiutarti?
                 </div>
             `;
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.add('hidden');
+            }
         }
         
         function showFeature(type) {
@@ -1314,6 +1415,9 @@ CHAT_HTML = """<!DOCTYPE html>
             };
             
             addMessage('ai', messages[type] || 'Come posso aiutarti?');
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.add('hidden');
+            }
         }
         
         function handleKey(e) {
@@ -1352,6 +1456,7 @@ CHAT_HTML = """<!DOCTYPE html>
             if (text) {
                 addMessage('user', text);
                 input.value = '';
+                input.style.height = 'auto';
             }
             
             document.getElementById('typing').classList.add('active');
@@ -1385,7 +1490,7 @@ CHAT_HTML = """<!DOCTYPE html>
                     } else if (data.type === 'image' && data.url) {
                         addMessage('ai', `<img src="${data.url}" alt="Generated">`);
                     } else {
-                        addMessage('ai', data.response);
+                        addMessage('ai', data.response.replace(/\n/g, '<br>'));
                     }
                 } else {
                     addMessage('ai', '❌ ' + (data.msg || 'Errore'));
@@ -1406,10 +1511,23 @@ CHAT_HTML = """<!DOCTYPE html>
         }
         
         // Auto-resize textarea
-        document.getElementById('input').addEventListener('input', function() {
+        const textarea = document.getElementById('input');
+        textarea.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
+        
+        // Fix per iOS Safari - prevent zoom on focus
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+            textarea.addEventListener('focus', function() {
+                document.body.style.zoom = '100%';
+            });
+        }
+        
+        // Inizializza: nascondi sidebar su mobile
+        if (window.innerWidth <= 768) {
+            document.getElementById('sidebar').classList.add('hidden');
+        }
     </script>
 </body>
 </html>"""
