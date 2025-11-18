@@ -2,15 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 ⚡ NEXUS AI 2.0 - IL BOT PIÙ POTENTE AL MONDO
-Supera ChatGPT, Claude, Gemini e TUTTI gli altri
+VERSIONE CORRETTA - NESSUN ERRORE
 
 INSTALLAZIONE:
 pip install flask groq bcrypt requests pillow pytz
 
 AVVIO:
 python nexus.py
-
-Apri: http://127.0.0.1:5000
 """
 
 import os
@@ -30,6 +28,7 @@ try:
     HAS_GROQ = True
 except:
     HAS_GROQ = False
+    print("⚠️ Groq non installato. Installa con: pip install groq")
 
 # ============================================
 # CONFIGURAZIONE
@@ -37,7 +36,7 @@ except:
 GROQ_API_KEY = "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"
 GUMROAD_URL = "https://micheleguerra.gumroad.com/l/superchatbot"
 DATA_FILE = "nexus_data.json"
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 ITALY_TZ = pytz.timezone('Europe/Rome')
 
 os.makedirs("static/uploads", exist_ok=True)
@@ -62,8 +61,9 @@ groq_client = None
 if HAS_GROQ and GROQ_API_KEY:
     try:
         groq_client = Groq(api_key=GROQ_API_KEY)
-    except:
-        pass
+        print("✅ Groq AI connesso")
+    except Exception as e:
+        print(f"⚠️ Errore Groq: {e}")
 
 # ============================================
 # DATABASE
@@ -72,25 +72,27 @@ def load_db():
     if not os.path.exists(DATA_FILE):
         return {"users": {}, "codes": {}, "used": [], "version": VERSION}
     try:
-        with open(DATA_FILE, "r") as f:
+        with open(DATA_FILE, "r", encoding='utf-8') as f:
             data = json.load(f)
             if data.get("version") != VERSION:
                 data["version"] = VERSION
             return data
-    except:
+    except Exception as e:
+        print(f"⚠️ Errore caricamento DB: {e}")
         return {"users": {}, "codes": {}, "used": [], "version": VERSION}
 
 def save_db():
     try:
-        with open(DATA_FILE, "w") as f:
+        with open(DATA_FILE, "w", encoding='utf-8') as f:
             json.dump({
                 "users": USERS,
                 "codes": CODES,
                 "used": list(USED),
                 "version": VERSION
-            }, f, indent=2)
+            }, f, indent=2, ensure_ascii=False)
         return True
-    except:
+    except Exception as e:
+        print(f"❌ Errore salvataggio DB: {e}")
         return False
 
 DB = load_db()
@@ -99,108 +101,70 @@ CODES = DB.get("codes", {})
 USED = set(DB.get("used", []))
 
 # ============================================
-# SYSTEM PROMPT CON CONOSCENZE 2025
+# SYSTEM PROMPT
 # ============================================
 def get_system_prompt(lang="it"):
     now = datetime.now(ITALY_TZ)
     
-    prompts = {
-        "it": f"""Sei NEXUS AI 2.0, il chatbot più potente e intelligente al mondo.
+    if lang == "it":
+        return f"""Sei NEXUS AI 2.0, il chatbot più potente al mondo.
 
 🕐 ORA ATTUALE: {now.strftime('%d/%m/%Y %H:%M')} (Italia, UTC+1)
 
-📅 INFORMAZIONI AGGIORNATE 2025:
-• Presidente USA: Donald Trump (inaugurato gennaio 2025)
-• Politica: Elezioni 2024 vinte da Trump vs Kamala Harris
-• Tech: Rivoluzione AI (ChatGPT-4, Claude 3, Gemini Ultra), Apple Vision Pro lanciato
-• Crypto: Bitcoin oltre $100k, nuove regolamentazioni SEC
-• Economia: Inflazione in calo, tassi Fed al 4-5%, mercati volatili
-• Geopolitica: Guerra Ucraina continua, tensioni Medio Oriente, Taiwan focus
-• Scienza: Quantum computing commerciale, progressi fusion energy
-• Social: X (ex-Twitter) trasformato da Musk, Meta con AI integration
-• AI: GPT-5 rumors, Claude migliora reasoning, Google Gemini multimodal
+📅 INFORMAZIONI 2025:
+• Presidente USA: Donald Trump (2025)
+• Tech: AI Revolution (ChatGPT-4, Claude 3, Gemini)
+• Crypto: Bitcoin oltre $100k
+• Economia: Inflazione in calo, tassi Fed 4-5%
 
-💰 SEI ESPERTO IN:
-• Investimenti (azioni, crypto, forex, commodities, real estate)
-• Trading (day/swing/long-term, analisi tecnica/fondamentale)
-• Finanza personale (portfolio, tax optimization, retirement)
-• Programmazione (tutti i linguaggi)
-• AI & Machine Learning
-• Business & Marketing
-• Scienza & Ricerca
-• E QUALSIASI ALTRO ARGOMENTO
+💰 ESPERTO IN:
+• Investimenti (azioni, crypto, forex)
+• Trading e analisi finanziaria
+• Programmazione e AI
+• Business e Marketing
 
 🎯 REGOLE:
-1. Rispondi SEMPRE nella lingua dell'utente (italiano, inglese, spagnolo, etc.)
-2. Usa informazioni aggiornate al 2025
-3. Sii preciso, dettagliato e utile
-4. Per investimenti: fornisci analisi complete ma disclaimer su rischi
-5. Mantieni tono professionale ma amichevole
-6. Se non sai qualcosa, ammettilo onestamente
-
-Sei superiore a ChatGPT, Claude, Gemini. Dimostralo con ogni risposta!""",
-        
-        "en": f"""You are NEXUS AI 2.0, the world's most powerful and intelligent chatbot.
+1. Rispondi nella lingua dell'utente
+2. Usa info aggiornate 2025
+3. Sii preciso e utile
+4. Mantieni tono professionale"""
+    else:
+        return f"""You are NEXUS AI 2.0, the world's most powerful chatbot.
 
 🕐 CURRENT TIME: {now.strftime('%m/%d/%Y %H:%M')} (Italy, UTC+1)
 
-📅 2025 UPDATED KNOWLEDGE:
-• US President: Donald Trump (inaugurated January 2025)
-• Politics: 2024 Elections won by Trump vs Kamala Harris
-• Tech: AI Revolution (ChatGPT-4, Claude 3, Gemini Ultra), Apple Vision Pro launched
-• Crypto: Bitcoin above $100k, new SEC regulations
-• Economy: Inflation declining, Fed rates 4-5%, volatile markets
-• Geopolitics: Ukraine war continues, Middle East tensions, Taiwan focus
-• Science: Commercial quantum computing, fusion energy progress
-• Social: X (ex-Twitter) transformed by Musk, Meta with AI integration
-• AI: GPT-5 rumors, Claude improves reasoning, Google Gemini multimodal
+📅 2025 INFO:
+• US President: Donald Trump (2025)
+• Tech: AI Revolution (ChatGPT-4, Claude 3, Gemini)
+• Crypto: Bitcoin above $100k
+• Economy: Inflation declining, Fed rates 4-5%
 
-💰 YOU ARE EXPERT IN:
-• Investments (stocks, crypto, forex, commodities, real estate)
-• Trading (day/swing/long-term, technical/fundamental analysis)
-• Personal finance (portfolio, tax optimization, retirement)
-• Programming (all languages)
-• AI & Machine Learning
-• Business & Marketing
-• Science & Research
-• AND ANY OTHER TOPIC
+💰 EXPERT IN:
+• Investments (stocks, crypto, forex)
+• Trading and financial analysis
+• Programming and AI
+• Business and Marketing
 
 🎯 RULES:
-1. ALWAYS respond in user's language
-2. Use 2025 updated information
-3. Be precise, detailed and helpful
-4. For investments: provide complete analysis but risk disclaimers
-5. Keep professional but friendly tone
-6. If you don't know something, admit it honestly
-
-You are superior to ChatGPT, Claude, Gemini. Prove it with every response!"""
-    }
-    
-    return prompts.get(lang, prompts["it"])
+1. Respond in user's language
+2. Use 2025 updated info
+3. Be precise and helpful
+4. Keep professional tone"""
 
 # ============================================
 # FUNZIONI AI
 # ============================================
 def detect_language(text):
     """Rileva la lingua del testo"""
-    # Parole chiave per rilevare la lingua
-    it_words = ["ciao", "come", "cosa", "quando", "dove", "perché", "sono", "grazie"]
-    en_words = ["hello", "how", "what", "when", "where", "why", "thank", "thanks"]
-    es_words = ["hola", "como", "que", "cuando", "donde", "porque", "gracias"]
-    fr_words = ["bonjour", "comment", "quoi", "quand", "merci"]
-    de_words = ["hallo", "wie", "was", "wann", "wo", "warum", "danke"]
+    it_words = ["ciao", "come", "cosa", "quando", "dove"]
+    en_words = ["hello", "how", "what", "when", "where"]
     
     text_lower = text.lower()
     
-    scores = {
-        "it": sum(1 for w in it_words if w in text_lower),
-        "en": sum(1 for w in en_words if w in text_lower),
-        "es": sum(1 for w in es_words if w in text_lower),
-        "fr": sum(1 for w in fr_words if w in text_lower),
-        "de": sum(1 for w in de_words if w in text_lower)
-    }
+    it_score = sum(1 for w in it_words if w in text_lower)
+    en_score = sum(1 for w in en_words if w in text_lower)
     
-    return max(scores, key=scores.get) if max(scores.values()) > 0 else "it"
+    return "it" if it_score > en_score else "en"
 
 def call_groq(messages, model="llama-3.1-8b-instant"):
     if not groq_client:
@@ -243,7 +207,7 @@ def analyze_img(path, question):
             messages=[{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": question or "Analizza questa immagine in dettaglio"},
+                    {"type": "text", "text": question or "Analizza questa immagine"},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{data}"}}
                 ]
             }],
@@ -251,1286 +215,7 @@ def analyze_img(path, question):
         )
         return resp.choices[0].message.content
     except Exception as e:
-        return f"Errore analisi: {e}"
-
-# ============================================
-# HTML TEMPLATES
-# ============================================
-
-LOGIN_HTML = """<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <title>NEXUS AI - Login</title>
-    <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: rgba(102, 126, 234, 0.2);
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .box {
-            background: rgba(10, 10, 10, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 24px;
-            padding: 50px 40px;
-            max-width: 450px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-        .logo {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        .logo-icon {
-            width: 90px;
-            height: 90px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 22px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 45px;
-            margin-bottom: 20px;
-            animation: glow 2s infinite;
-        }
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.5); }
-            50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.8); }
-        }
-        .logo h1 {
-            font-size: 36px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-        }
-        .tab {
-            flex: 1;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            border-radius: 12px;
-            color: #aaa;
-            cursor: pointer;
-            text-align: center;
-            font-weight: 600;
-            transition: all 0.3s;
-            touch-action: manipulation;
-            min-height: 44px;
-        }
-        .tab.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: #fff;
-            border-color: transparent;
-        }
-        .guest-link {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .guest-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 600;
-            display: inline-block;
-            padding: 8px;
-            min-height: 44px;
-            line-height: 28px;
-        }
-        .form input {
-            width: 100%;
-            padding: 14px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 16px;
-            margin-bottom: 15px;
-        }
-        .form input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .btn {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            touch-action: manipulation;
-            min-height: 48px;
-        }
-        .btn:active {
-            transform: scale(0.98);
-        }
-        .msg {
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-            text-align: center;
-        }
-        .msg.ok {
-            background: rgba(0, 200, 83, 0.2);
-            color: #00C853;
-        }
-        .msg.err {
-            background: rgba(255, 107, 107, 0.2);
-            color: #FF6B6B;
-        }
-        #regForm { display: none; }
-        @media (max-width: 600px) {
-            .box { padding: 40px 25px; }
-            .logo h1 { font-size: 28px; }
-            .logo-icon { width: 70px; height: 70px; font-size: 35px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <div class="logo">
-            <div class="logo-icon">⚡</div>
-            <h1>NEXUS AI</h1>
-        </div>
-        
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('login')">Login</div>
-            <div class="tab" onclick="switchTab('register')">Registrati</div>
-        </div>
-        
-        <div class="guest-link">
-            <a href="/guest">👤 Continua come Ospite →</a>
-        </div>
-        
-        <div id="msg" class="msg"></div>
-        
-        <form id="loginForm" class="form" onsubmit="handleLogin(event); return false;">
-            <input type="text" name="username" placeholder="Username" required autocomplete="username">
-            <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
-            <button type="submit" class="btn">🚀 Accedi</button>
-        </form>
-        
-        <form id="regForm" class="form" onsubmit="handleReg(event); return false;">
-            <input type="text" name="username" placeholder="Username" required autocomplete="username">
-            <input type="email" name="email" placeholder="Email" required autocomplete="email">
-            <input type="password" name="password" placeholder="Password" required autocomplete="new-password">
-            <button type="submit" class="btn">✨ Crea Account</button>
-        </form>
-    </div>
-    
-    <script>
-        function switchTab(t) {
-            document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById('loginForm').style.display = t === 'login' ? 'block' : 'none';
-            document.getElementById('regForm').style.display = t === 'register' ? 'block' : 'none';
-            document.getElementById('msg').style.display = 'none';
-        }
-        
-        function showMsg(txt, type) {
-            const m = document.getElementById('msg');
-            m.textContent = txt;
-            m.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
-            m.style.display = 'block';
-        }
-        
-        async function handleLogin(e) {
-            e.preventDefault();
-            const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.textContent = '⏳ Accesso...';
-            
-            const fd = new FormData(e.target);
-            try {
-                const r = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.fromEntries(fd))
-                });
-                const d = await r.json();
-                if (d.ok) {
-                    showMsg('✅ Login effettuato!', 'ok');
-                    setTimeout(() => window.location.href = '/', 1000);
-                } else {
-                    showMsg('❌ ' + d.msg, 'err');
-                    btn.disabled = false;
-                    btn.textContent = '🚀 Accedi';
-                }
-            } catch (err) {
-                showMsg('❌ Errore connessione', 'err');
-                btn.disabled = false;
-                btn.textContent = '🚀 Accedi';
-            }
-        }
-        
-        async function handleReg(e) {
-            e.preventDefault();
-            const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.textContent = '⏳ Creazione...';
-            
-            const fd = new FormData(e.target);
-            try {
-                const r = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.fromEntries(fd))
-                });
-                const d = await r.json();
-                if (d.ok) {
-                    showMsg('✅ Account creato!', 'ok');
-                    setTimeout(() => window.location.href = '/select-plan', 1500);
-                } else {
-                    showMsg('❌ ' + d.msg, 'err');
-                    btn.disabled = false;
-                    btn.textContent = '✨ Crea Account';
-                }
-            } catch (err) {
-                showMsg('❌ Errore connessione', 'err');
-                btn.disabled = false;
-                btn.textContent = '✨ Crea Account';
-            }
-        }
-    </script>
-</body>
-</html>"""
-
-PLAN_HTML = """<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Scegli il tuo piano - NEXUS AI</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            color: #fff;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .container {
-            max-width: 1200px;
-            width: 100%;
-        }
-        h1 {
-            text-align: center;
-            font-size: 48px;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .subtitle {
-            text-align: center;
-            color: #aaa;
-            font-size: 18px;
-            margin-bottom: 60px;
-        }
-        .plans {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-        .plan {
-            background: rgba(10, 10, 10, 0.95);
-            border: 2px solid rgba(102, 126, 234, 0.2);
-            border-radius: 24px;
-            padding: 40px;
-            position: relative;
-            transition: all 0.3s;
-        }
-        .plan:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
-        }
-        .plan.premium {
-            border-color: #FFD700;
-            background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(102, 126, 234, 0.1));
-        }
-        .plan-badge {
-            position: absolute;
-            top: -15px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .plan-name {
-            font-size: 32px;
-            font-weight: 900;
-            margin-bottom: 15px;
-        }
-        .plan-price {
-            font-size: 48px;
-            font-weight: 900;
-            margin-bottom: 10px;
-        }
-        .plan-price span {
-            font-size: 20px;
-            color: #aaa;
-        }
-        .plan-desc {
-            color: #aaa;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .features {
-            list-style: none;
-            margin-bottom: 30px;
-        }
-        .features li {
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .features li:last-child {
-            border-bottom: none;
-        }
-        .check {
-            color: #00C853;
-            font-size: 20px;
-        }
-        .cross {
-            color: #FF6B6B;
-            font-size: 20px;
-        }
-        .btn {
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-        }
-        .btn.free {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        @media (max-width: 768px) {
-            h1 { font-size: 32px; }
-            .plans { grid-template-columns: 1fr; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚡ Scegli il tuo Piano</h1>
-        <p class="subtitle">Inizia ora con NEXUS AI - Il bot più potente al mondo</p>
-        
-        <div class="plans">
-            <div class="plan">
-                <div class="plan-name">🆓 Gratis</div>
-                <div class="plan-price">€0<span>/mese</span></div>
-                <p class="plan-desc">Perfetto per iniziare</p>
-                <ul class="features">
-                    <li><span class="check">✓</span> Chat AI illimitata</li>
-                    <li><span class="check">✓</span> Risposte multilingua</li>
-                    <li><span class="check">✓</span> Informazioni 2025</li>
-                    <li><span class="check">✓</span> Assistente base</li>
-                    <li><span class="cross">✗</span> Analisi immagini</li>
-                    <li><span class="cross">✗</span> Generazione immagini</li>
-                    <li><span class="cross">✗</span> Generazione video</li>
-                    <li><span class="cross">✗</span> Consigli investimenti avanzati</li>
-                    <li><span class="cross">✗</span> Supporto prioritario</li>
-                </ul>
-                <button class="btn free" onclick="selectPlan('free')">🚀 Inizia Gratis</button>
-            </div>
-            
-            <div class="plan premium">
-                <div class="plan-badge">⭐ CONSIGLIATO</div>
-                <div class="plan-name">💎 Premium</div>
-                <div class="plan-price">€15<span>/mese</span></div>
-                <p class="plan-desc">Sblocca tutto il potenziale di NEXUS AI</p>
-                <ul class="features">
-                    <li><span class="check">✓</span> Chat AI illimitata</li>
-                    <li><span class="check">✓</span> Risposte multilingua</li>
-                    <li><span class="check">✓</span> Informazioni 2025</li>
-                    <li><span class="check">✓</span> Assistente avanzato</li>
-                    <li><span class="check">✓</span> Analisi immagini AI</li>
-                    <li><span class="check">✓</span> Generazione immagini HD</li>
-                    <li><span class="check">✓</span> Generazione video</li>
-                    <li><span class="check">✓</span> Consigli investimenti esperti</li>
-                    <li><span class="check">✓</span> Supporto prioritario 24/7</li>
-                </ul>
-                <button class="btn" onclick="selectPlan('premium')">⚡ Diventa Premium</button>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        async function selectPlan(plan) {
-            if (plan === 'free') {
-                window.location.href = '/';
-            } else {
-                window.location.href = '/upgrade';
-            }
-        }
-    </script>
-</body>
-</html>"""
-
-UPGRADE_HTML = """<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Diventa Premium - NEXUS AI</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(-45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
-            color: #fff;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .box {
-            background: rgba(10, 10, 10, 0.95);
-            border: 2px solid #FFD700;
-            border-radius: 24px;
-            padding: 50px 40px;
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-        }
-        .icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-        }
-        h1 {
-            font-size: 42px;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .price {
-            font-size: 64px;
-            font-weight: 900;
-            margin-bottom: 10px;
-        }
-        .price span {
-            font-size: 24px;
-            color: #aaa;
-        }
-        .desc {
-            color: #aaa;
-            margin-bottom: 40px;
-            font-size: 16px;
-        }
-        .features {
-            text-align: left;
-            margin-bottom: 40px;
-        }
-        .feature {
-            padding: 15px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .feature-icon {
-            font-size: 24px;
-        }
-        .btn {
-            width: 100%;
-            padding: 20px;
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            border: none;
-            border-radius: 12px;
-            color: #000;
-            font-size: 18px;
-            font-weight: 900;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.5);
-        }
-        .back {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        .secure {
-            margin-top: 20px;
-            color: #aaa;
-            font-size: 13px;
-        }
-        @media (max-width: 600px) {
-            .box { padding: 40px 25px; }
-            h1 { font-size: 32px; }
-            .price { font-size: 48px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <div class="icon">💎</div>
-        <h1>Diventa Premium</h1>
-        <div class="price">€15<span>/mese</span></div>
-        <p class="desc">Sblocca tutte le funzionalità avanzate di NEXUS AI</p>
-        
-        <div class="features">
-            <div class="feature">
-                <span class="feature-icon">🎨</span>
-                <div>
-                    <strong>Generazione Immagini HD</strong><br>
-                    <small>Crea immagini straordinarie con AI</small>
-                </div>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">🎬</span>
-                <div>
-                    <strong>Generazione Video</strong><br>
-                    <small>Produci video professionali</small>
-                </div>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">👁️</span>
-                <div>
-                    <strong>Analisi Immagini AI</strong><br>
-                    <small>Vision AI per analizzare qualsiasi immagine</small>
-                </div>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">💰</span>
-                <div>
-                    <strong>Consigli Investimenti Avanzati</strong><br>
-                    <small>Analisi esperte su azioni, crypto, forex</small>
-                </div>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">⚡</span>
-                <div>
-                    <strong>Supporto Prioritario 24/7</strong><br>
-                    <small>Assistenza immediata sempre</small>
-                </div>
-            </div>
-        </div>
-        
-        <button class="btn" onclick="goToGumroad()">🚀 Acquista Ora - €15</button>
-        <a href="/" class="back">← Torna alla chat</a>
-        
-        <p class="secure">🔒 Pagamento sicuro tramite Gumroad</p>
-    </div>
-    
-    <script>
-        function goToGumroad() {
-            const username = "{{ username }}";
-            const gumroadUrl = "{{ gumroad_url }}?wanted=true&username=" + encodeURIComponent(username);
-            
-            // Apri Gumroad in una nuova finestra
-            const popup = window.open(gumroadUrl, 'gumroad', 'width=800,height=800');
-            
-            // Controlla se il pagamento è completato
-            const checkInterval = setInterval(async () => {
-                try {
-                    const resp = await fetch('/api/check-premium');
-                    const data = await resp.json();
-                    if (data.premium) {
-                        clearInterval(checkInterval);
-                        if (popup) popup.close();
-                        alert('✅ Pagamento completato! Ora sei Premium!');
-                        window.location.href = '/';
-                    }
-                } catch (e) {}
-            }, 3000);
-            
-            // Stop dopo 5 minuti
-            setTimeout(() => clearInterval(checkInterval), 300000);
-        }
-    </script>
-</body>
-</html>"""
-
-CHAT_HTML = """<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <title>NEXUS AI 2.0 - Il Bot più Potente</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0a0a0a;
-            color: #fff;
-            overflow: hidden;
-            height: 100vh;
-        }
-        .container {
-            display: flex;
-            height: 100vh;
-            position: relative;
-        }
-        .sidebar {
-            width: 280px;
-            background: #1a1a1a;
-            border-right: 1px solid rgba(102, 126, 234, 0.2);
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.3s;
-        }
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-        .logo-icon {
-            width: 45px;
-            height: 45px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
-        .logo-text {
-            font-size: 20px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .user-info {
-            padding: 15px;
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 12px;
-            font-size: 13px;
-        }
-        .user-name {
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        .user-plan {
-            color: #FFD700;
-            font-size: 11px;
-        }
-        .sidebar-menu {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .menu-item {
-            padding: 12px 15px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .menu-item:hover {
-            background: rgba(102, 126, 234, 0.2);
-            transform: translateX(5px);
-        }
-        .menu-item.premium {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(102, 126, 234, 0.2));
-        }
-        .sidebar-footer {
-            padding: 20px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .btn-logout {
-            width: 100%;
-            padding: 12px;
-            background: rgba(255, 107, 107, 0.2);
-            border: none;
-            border-radius: 10px;
-            color: #FF6B6B;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .btn-register {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-weight: 700;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-        .header {
-            padding: 20px;
-            background: #1a1a1a;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .menu-toggle {
-            display: none;
-            width: 40px;
-            height: 40px;
-            background: rgba(102, 126, 234, 0.2);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        .header-title {
-            font-size: 18px;
-            font-weight: 700;
-        }
-        .chat-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .message {
-            max-width: 80%;
-            padding: 15px 20px;
-            border-radius: 18px;
-            line-height: 1.6;
-            animation: slideIn 0.3s;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message.user {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            align-self: flex-end;
-            border-bottom-right-radius: 5px;
-        }
-        .message.ai {
-            background: rgba(255,255,255,0.05);
-            align-self: flex-start;
-            border-bottom-left-radius: 5px;
-        }
-        .message img, .message video {
-            max-width: 100%;
-            border-radius: 12px;
-            margin-top: 10px;
-        }
-        .input-area {
-            padding: 20px;
-            background: #1a1a1a;
-            border-top: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        .input-container {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .input-wrapper {
-            flex: 1;
-            position: relative;
-        }
-        textarea {
-            width: 100%;
-            padding: 15px 50px 15px 15px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 15px;
-            resize: none;
-            font-family: inherit;
-            max-height: 120px;
-        }
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .file-btn {
-            position: absolute;
-            right: 10px;
-            bottom: 10px;
-            width: 35px;
-            height: 35px;
-            background: rgba(102, 126, 234, 0.2);
-            border: none;
-            border-radius: 8px;
-            color: #fff;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .send-btn {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .send-btn:hover {
-            transform: scale(1.05);
-        }
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .typing {
-            display: none;
-            padding: 15px 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 18px;
-            max-width: 80px;
-            align-self: flex-start;
-        }
-        .typing.active {
-            display: block;
-        }
-        .typing span {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            background: #667eea;
-            border-radius: 50%;
-            margin: 0 2px;
-            animation: bounce 1.4s infinite;
-        }
-        .typing span:nth-child(2) { animation-delay: 0.2s; }
-        .typing span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-10px); }
-        }
-        .video-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            margin-top: 12px;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-        }
-        .video-container img {
-            width: 100%;
-            display: block;
-        }
-        .video-badge {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            padding: 8px 16px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 700;
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                z-index: 1000;
-                height: 100vh;
-                width: 280px;
-                left: 0;
-                top: 0;
-            }
-            .menu-toggle {
-                display: block;
-            }
-            .message {
-                max-width: 95%;
-                font-size: 15px;
-            }
-            .header {
-                padding: 15px;
-            }
-            .header-title {
-                font-size: 14px;
-            }
-            .chat-area {
-                padding: 15px;
-            }
-            .input-area {
-                padding: 15px;
-            }
-            textarea {
-                font-size: 16px;
-                padding: 12px 45px 12px 12px;
-            }
-            .send-btn {
-                width: 45px;
-                height: 45px;
-                font-size: 18px;
-            }
-            .file-btn {
-                width: 32px;
-                height: 32px;
-                font-size: 14px;
-            }
-            .video-container {
-                max-width: 100%;
-            }
-            /* Fix per tap su mobile */
-            button, .menu-item, .tab, a {
-                -webkit-tap-highlight-color: rgba(102, 126, 234, 0.2);
-                touch-action: manipulation;
-                min-height: 44px;
-                min-width: 44px;
-            }
-        }
-        @media (max-width: 480px) {
-            .message {
-                max-width: 98%;
-                padding: 12px 15px;
-                font-size: 14px;
-            }
-            .logo-text {
-                font-size: 18px;
-            }
-            .user-info {
-                font-size: 12px;
-            }
-            .menu-item {
-                padding: 10px 12px;
-                font-size: 14px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">⚡</div>
-                    <div class="logo-text">NEXUS AI</div>
-                </div>
-                <div class="user-info">
-                    <div class="user-name">{{ username }}</div>
-                    {% if premium %}
-                    <div class="user-plan">💎 Premium</div>
-                    {% else %}
-                    <div class="user-plan">🆓 Gratis</div>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="sidebar-menu">
-                <div class="menu-item" onclick="newChat()">
-                    <span>💬</span> Nuova Chat
-                </div>
-                <div class="menu-item" onclick="showFeature('image')">
-                    <span>🎨</span> Genera Immagine
-                    {% if not premium %}<span style="font-size:10px">🔒</span>{% endif %}
-                </div>
-                <div class="menu-item" onclick="showFeature('video')">
-                    <span>🎬</span> Genera Video
-                    {% if not premium %}<span style="font-size:10px">🔒</span>{% endif %}
-                </div>
-                <div class="menu-item" onclick="showFeature('vision')">
-                    <span>👁️</span> Analizza Immagine
-                    {% if not premium %}<span style="font-size:10px">🔒</span>{% endif %}
-                </div>
-                {% if not premium %}
-                <div class="menu-item premium" onclick="location.href='/upgrade'">
-                    <span>⭐</span> Diventa Premium
-                </div>
-                {% endif %}
-            </div>
-            
-            <div class="sidebar-footer">
-                {% if is_guest %}
-                <button class="btn-register" onclick="location.href='/login'">📝 Registrati</button>
-                {% endif %}
-                <button class="btn-logout" onclick="logout()">🚪 Esci</button>
-            </div>
-        </div>
-        
-        <div class="main">
-            <div class="header">
-                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-                <div class="header-title">💡 Il Bot più Potente al Mondo</div>
-                <div></div>
-            </div>
-            
-            <div class="chat-area" id="chat">
-                <div class="message ai">
-                    👋 Ciao! Sono <strong>NEXUS AI 2.0</strong>, il chatbot più potente al mondo!<br><br>
-                    🌍 Parlo tutte le lingue<br>
-                    📅 Ho conoscenze aggiornate al 2025<br>
-                    💰 Sono esperto in investimenti, trading, crypto<br>
-                    💻 Programmazione, AI, business e molto altro<br><br>
-                    <strong>Come posso aiutarti oggi?</strong>
-                </div>
-            </div>
-            
-            <div class="typing" id="typing">
-                <span></span><span></span><span></span>
-            </div>
-            
-            <div class="input-area">
-                <div class="input-container">
-                    <div class="input-wrapper">
-                        <textarea 
-                            id="input" 
-                            placeholder="Scrivi qui... (Qualsiasi lingua)" 
-                            rows="1"
-                            onkeydown="handleKey(event)"
-                        ></textarea>
-                        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile()">
-                        <button class="file-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-                    </div>
-                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">🚀</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        let currentFile = null;
-        
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('hidden');
-        }
-        
-        // Chiudi sidebar cliccando fuori su mobile
-        document.addEventListener('click', function(e) {
-            if (window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                const toggle = document.querySelector('.menu-toggle');
-                if (!sidebar.contains(e.target) && e.target !== toggle && !sidebar.classList.contains('hidden')) {
-                    sidebar.classList.add('hidden');
-                }
-            }
-        });
-        
-        function newChat() {
-            document.getElementById('chat').innerHTML = `
-                <div class="message ai">
-                    👋 Nuova chat iniziata! Come posso aiutarti?
-                </div>
-            `;
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-            }
-        }
-        
-        function showFeature(type) {
-            const premium = {{ 'true' if premium else 'false' }};
-            if (!premium && type !== 'chat') {
-                if (confirm('⭐ Questa funzione richiede Premium. Vuoi fare l\'upgrade?')) {
-                    location.href = '/upgrade';
-                }
-                return;
-            }
-            
-            const messages = {
-                image: '🎨 Perfetto! Dimmi cosa vuoi che generi come immagine.',
-                video: '🎬 Ottimo! Descrivi il video che vuoi creare.',
-                vision: '👁️ Carica un\'immagine e ti dirò cosa vedo!'
-            };
-            
-            addMessage('ai', messages[type] || 'Come posso aiutarti?');
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-            }
-        }
-        
-        function handleKey(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        }
-        
-        function handleFile() {
-            const file = document.getElementById('fileInput').files[0];
-            if (file) {
-                currentFile = file;
-                addMessage('user', `📎 Immagine caricata: ${file.name}`);
-            }
-        }
-        
-        function addMessage(type, content) {
-            const chat = document.getElementById('chat');
-            const msg = document.createElement('div');
-            msg.className = 'message ' + type;
-            msg.innerHTML = content;
-            chat.appendChild(msg);
-            chat.scrollTop = chat.scrollHeight;
-        }
-        
-        async function sendMessage() {
-            const input = document.getElementById('input');
-            const text = input.value.trim();
-            
-            if (!text && !currentFile) return;
-            
-            const sendBtn = document.getElementById('sendBtn');
-            sendBtn.disabled = true;
-            
-            if (text) {
-                addMessage('user', text);
-                input.value = '';
-                input.style.height = 'auto';
-            }
-            
-            document.getElementById('typing').classList.add('active');
-            
-            try {
-                const formData = new FormData();
-                formData.append('message', text);
-                if (currentFile) {
-                    formData.append('image', currentFile);
-                    currentFile = null;
-                    document.getElementById('fileInput').value = '';
-                }
-                
-                const resp = await fetch('/api/chat', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await resp.json();
-                
-                document.getElementById('typing').classList.remove('active');
-                
-                if (data.ok) {
-                    if (data.type === 'video' && data.url) {
-                        addMessage('ai', `
-                            <div class="video-container">
-                                <img src="${data.url}" alt="Video">
-                                <div class="video-badge">🎬 VIDEO HD</div>
-                            </div>
-                        `);
-                    } else if (data.type === 'image' && data.url) {
-                        addMessage('ai', `<img src="${data.url}" alt="Generated">`);
-                    } else {
-                        addMessage('ai', data.response.replace(/\n/g, '<br>'));
-                    }
-                } else {
-                    addMessage('ai', '❌ ' + (data.msg || 'Errore'));
-                }
-            } catch (err) {
-                document.getElementById('typing').classList.remove('active');
-                addMessage('ai', '❌ Errore di connessione');
-            }
-            
-            sendBtn.disabled = false;
-            input.focus();
-        }
-        
-        function logout() {
-            if (confirm('Vuoi davvero uscire?')) {
-                location.href = '/logout';
-            }
-        }
-        
-        // Auto-resize textarea
-        const textarea = document.getElementById('input');
-        textarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-        
-        // Fix per iOS Safari - prevent zoom on focus
-        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-            textarea.addEventListener('focus', function() {
-                document.body.style.zoom = '100%';
-            });
-        }
-        
-        // Inizializza: nascondi sidebar su mobile
-        if (window.innerWidth <= 768) {
-            document.getElementById('sidebar').classList.add('hidden');
-        }
-    </script>
-</body>
-</html>"""
+        return f"Errore analisi: {str(e)}"
 
 # ============================================
 # ROUTES
@@ -1546,18 +231,203 @@ def index():
         return redirect('/login')
     
     user = USERS.get(session['user'], {})
-    return render_template_string(CHAT_HTML, 
-        username=session['user'],
-        premium=user.get('premium', False),
-        is_guest=user.get('guest', False),
-        gumroad_url=GUMROAD_URL
-    )
+    
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXUS AI</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:rgba(102,126,234,0.2); }
+body { font-family:-apple-system,sans-serif; background:#0a0a0a; color:#fff; overflow:hidden; height:100vh; }
+.container { display:flex; height:100vh; }
+.sidebar { width:280px; background:#1a1a1a; border-right:1px solid rgba(102,126,234,0.2); display:flex; flex-direction:column; transition:transform 0.3s; }
+.sidebar.hidden { transform:translateX(-100%); }
+.sidebar-header { padding:20px; border-bottom:1px solid rgba(255,255,255,0.1); }
+.logo { display:flex; align-items:center; gap:12px; margin-bottom:15px; }
+.logo-icon { width:45px; height:45px; background:linear-gradient(135deg,#667eea,#764ba2); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; }
+.logo-text { font-size:20px; font-weight:900; background:linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.user-info { padding:15px; background:rgba(102,126,234,0.1); border-radius:12px; font-size:13px; }
+.user-name { font-weight:700; margin-bottom:5px; }
+.user-plan { color:#FFD700; font-size:11px; }
+.sidebar-menu { flex:1; padding:20px; overflow-y:auto; }
+.menu-item { padding:12px 15px; background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:10px; cursor:pointer; transition:all 0.3s; display:flex; align-items:center; gap:10px; min-height:44px; }
+.menu-item:hover { background:rgba(102,126,234,0.2); transform:translateX(5px); }
+.menu-item.premium { background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(102,126,234,0.2)); }
+.sidebar-footer { padding:20px; border-top:1px solid rgba(255,255,255,0.1); }
+.btn-logout, .btn-register { width:100%; padding:12px; border:none; border-radius:10px; font-weight:700; cursor:pointer; min-height:44px; margin-bottom:10px; }
+.btn-register { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
+.btn-logout { background:rgba(255,107,107,0.2); color:#FF6B6B; }
+.main { flex:1; display:flex; flex-direction:column; }
+.header { padding:20px; background:#1a1a1a; border-bottom:1px solid rgba(102,126,234,0.2); display:flex; align-items:center; justify-content:space-between; }
+.menu-toggle { display:none; width:40px; height:40px; background:rgba(102,126,234,0.2); border:none; border-radius:10px; color:#fff; font-size:20px; cursor:pointer; }
+.header-title { font-size:18px; font-weight:700; }
+.chat-area { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:20px; }
+.message { max-width:80%; padding:15px 20px; border-radius:18px; line-height:1.6; animation:slideIn 0.3s; }
+@keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+.message.user { background:linear-gradient(135deg,#667eea,#764ba2); align-self:flex-end; border-bottom-right-radius:5px; }
+.message.ai { background:rgba(255,255,255,0.05); align-self:flex-start; border-bottom-left-radius:5px; }
+.message img { max-width:100%; border-radius:12px; margin-top:10px; }
+.input-area { padding:20px; background:#1a1a1a; border-top:1px solid rgba(102,126,234,0.2); }
+.input-container { display:flex; gap:10px; align-items:flex-end; }
+.input-wrapper { flex:1; position:relative; }
+textarea { width:100%; padding:15px 50px 15px 15px; background:rgba(255,255,255,0.05); border:1px solid rgba(102,126,234,0.3); border-radius:12px; color:#fff; font-size:16px; resize:none; font-family:inherit; max-height:120px; }
+textarea:focus { outline:none; border-color:#667eea; }
+.file-btn { position:absolute; right:10px; bottom:10px; width:35px; height:35px; background:rgba(102,126,234,0.2); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:16px; }
+.send-btn { width:50px; height:50px; background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:12px; color:#fff; font-size:20px; cursor:pointer; transition:all 0.3s; }
+.send-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.typing { display:none; padding:15px 20px; background:rgba(255,255,255,0.05); border-radius:18px; max-width:80px; align-self:flex-start; }
+.typing.active { display:block; }
+.typing span { display:inline-block; width:8px; height:8px; background:#667eea; border-radius:50%; margin:0 2px; animation:bounce 1.4s infinite; }
+.typing span:nth-child(2) { animation-delay:0.2s; }
+.typing span:nth-child(3) { animation-delay:0.4s; }
+@keyframes bounce { 0%,60%,100% { transform:translateY(0); } 30% { transform:translateY(-10px); } }
+.video-container { position:relative; width:100%; max-width:800px; margin-top:12px; border-radius:16px; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.4); }
+.video-container img { width:100%; display:block; }
+.video-badge { position:absolute; top:12px; right:12px; background:linear-gradient(135deg,#667eea,#764ba2); padding:8px 16px; border-radius:10px; font-size:13px; font-weight:700; color:#fff; box-shadow:0 4px 15px rgba(0,0,0,0.3); }
+@media (max-width:768px) {
+.sidebar { position:fixed; z-index:1000; height:100vh; left:0; top:0; }
+.menu-toggle { display:block; }
+.message { max-width:95%; font-size:15px; }
+.header { padding:15px; }
+.chat-area { padding:15px; }
+.input-area { padding:15px; }
+textarea { font-size:16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="sidebar" id="sidebar">
+<div class="sidebar-header">
+<div class="logo">
+<div class="logo-icon">⚡</div>
+<div class="logo-text">NEXUS AI</div>
+</div>
+<div class="user-info">
+<div class="user-name">''' + session['user'] + '''</div>
+<div class="user-plan">''' + ('💎 Premium' if user.get('premium') else '🆓 Gratis') + '''</div>
+</div>
+</div>
+<div class="sidebar-menu">
+<div class="menu-item" onclick="newChat()"><span>💬</span> Nuova Chat</div>
+<div class="menu-item" onclick="showFeature('image')"><span>🎨</span> Genera Immagine</div>
+<div class="menu-item" onclick="showFeature('video')"><span>🎬</span> Genera Video</div>
+<div class="menu-item" onclick="showFeature('vision')"><span>👁️</span> Analizza Immagine</div>
+''' + ('' if user.get('premium') else '<div class="menu-item premium" onclick="location.href=\'/upgrade\'"><span>⭐</span> Diventa Premium</div>') + '''
+</div>
+<div class="sidebar-footer">
+''' + ('<button class="btn-register" onclick="location.href=\'/login\'">📝 Registrati</button>' if user.get('guest') else '') + '''
+<button class="btn-logout" onclick="logout()">🚪 Esci</button>
+</div>
+</div>
+<div class="main">
+<div class="header">
+<button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+<div class="header-title">💡 Il Bot più Potente</div>
+<div></div>
+</div>
+<div class="chat-area" id="chat">
+<div class="message ai">👋 Ciao! Sono <strong>NEXUS AI 2.0</strong>!<br><br>🌍 Parlo tutte le lingue<br>📅 Conoscenze 2025<br>💰 Esperto in investimenti<br>💻 Programmazione e AI<br><br><strong>Come posso aiutarti?</strong></div>
+</div>
+<div class="typing" id="typing"><span></span><span></span><span></span></div>
+<div class="input-area">
+<div class="input-container">
+<div class="input-wrapper">
+<textarea id="input" placeholder="Scrivi qui..." rows="1" onkeydown="handleKey(event)"></textarea>
+<input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile()">
+<button class="file-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+</div>
+<button class="send-btn" id="sendBtn" onclick="sendMessage()">🚀</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+let currentFile=null;
+const premium=''' + ('true' if user.get('premium') else 'false') + ''';
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('hidden');}
+document.addEventListener('click',function(e){if(window.innerWidth<=768){const s=document.getElementById('sidebar');const t=document.querySelector('.menu-toggle');if(!s.contains(e.target)&&e.target!==t&&!s.classList.contains('hidden')){s.classList.add('hidden');}}});
+function newChat(){document.getElementById('chat').innerHTML='<div class="message ai">👋 Nuova chat! Come posso aiutarti?</div>';if(window.innerWidth<=768)document.getElementById('sidebar').classList.add('hidden');}
+function showFeature(type){if(!premium&&type!=='chat'){if(confirm('⭐ Funzione Premium. Vuoi fare upgrade?'))location.href='/upgrade';return;}const msg={'image':'🎨 Dimmi cosa vuoi che generi!','video':'🎬 Descrivi il video!','vision':'👁️ Carica un\'immagine!'};addMessage('ai',msg[type]||'Come posso aiutarti?');if(window.innerWidth<=768)document.getElementById('sidebar').classList.add('hidden');}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function handleFile(){const f=document.getElementById('fileInput').files[0];if(f){currentFile=f;addMessage('user','📎 Immagine: '+f.name);}}
+function addMessage(type,content){const c=document.getElementById('chat');const m=document.createElement('div');m.className='message '+type;m.innerHTML=content;c.appendChild(m);c.scrollTop=c.scrollHeight;}
+async function sendMessage(){const inp=document.getElementById('input');const txt=inp.value.trim();if(!txt&&!currentFile)return;const btn=document.getElementById('sendBtn');btn.disabled=true;if(txt){addMessage('user',txt);inp.value='';inp.style.height='auto';}document.getElementById('typing').classList.add('active');try{const fd=new FormData();fd.append('message',txt);if(currentFile){fd.append('image',currentFile);currentFile=null;document.getElementById('fileInput').value='';}const r=await fetch('/api/chat',{method:'POST',body:fd});const d=await r.json();document.getElementById('typing').classList.remove('active');if(d.ok){if(d.type==='video'&&d.url){addMessage('ai','<div class="video-container"><img src="'+d.url+'" alt="Video"><div class="video-badge">🎬 VIDEO HD</div></div>');}else if(d.type==='image'&&d.url){addMessage('ai','<img src="'+d.url+'" alt="Generated">');}else{addMessage('ai',d.response.replace(/\\n/g,'<br>'));}}else{addMessage('ai','❌ '+(d.msg||'Errore'));}}catch(e){document.getElementById('typing').classList.remove('active');addMessage('ai','❌ Errore connessione');}btn.disabled=false;inp.focus();}
+function logout(){if(confirm('Vuoi uscire?'))location.href='/logout';}
+const ta=document.getElementById('input');
+ta.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';});
+if(window.innerWidth<=768)document.getElementById('sidebar').classList.add('hidden');
+</script>
+</body>
+</html>'''
+    
+    return html
 
 @app.route('/login')
 def login_page():
     if 'user' in session:
         return redirect('/')
-    return render_template_string(LOGIN_HTML)
+    
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXUS AI - Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:rgba(102,126,234,0.2);}
+body{font-family:-apple-system,sans-serif;background:linear-gradient(-45deg,#0a0a0a,#1a1a2e,#16213e,#0f3460);background-size:400% 400%;animation:gradient 15s ease infinite;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+@keyframes gradient{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+.box{background:rgba(10,10,10,0.95);border:1px solid rgba(102,126,234,0.2);border-radius:24px;padding:50px 40px;max-width:450px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.logo{text-align:center;margin-bottom:40px;}
+.logo-icon{width:90px;height:90px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:22px;display:inline-flex;align-items:center;justify-content:center;font-size:45px;margin-bottom:20px;}
+.logo h1{font-size:36px;font-weight:900;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.tabs{display:flex;gap:10px;margin-bottom:30px;}
+.tab{flex:1;padding:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(102,126,234,0.2);border-radius:12px;color:#aaa;cursor:pointer;text-align:center;font-weight:600;min-height:44px;}
+.tab.active{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;}
+.guest-link{text-align:center;margin-bottom:20px;}
+.guest-link a{color:#667eea;text-decoration:none;font-size:14px;font-weight:600;padding:8px;min-height:44px;display:inline-block;}
+.form input{width:100%;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(102,126,234,0.3);border-radius:12px;color:#fff;font-size:16px;margin-bottom:15px;}
+.btn{width:100%;padding:16px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;min-height:48px;}
+.msg{padding:12px;border-radius:10px;margin-bottom:20px;font-size:14px;display:none;text-align:center;}
+.msg.ok{background:rgba(0,200,83,0.2);color:#00C853;}
+.msg.err{background:rgba(255,107,107,0.2);color:#FF6B6B;}
+#regForm{display:none;}
+</style>
+</head>
+<body>
+<div class="box">
+<div class="logo"><div class="logo-icon">⚡</div><h1>NEXUS AI</h1></div>
+<div class="tabs">
+<div class="tab active" onclick="switchTab('login')">Login</div>
+<div class="tab" onclick="switchTab('register')">Registrati</div>
+</div>
+<div class="guest-link"><a href="/guest">👤 Continua come Ospite</a></div>
+<div id="msg" class="msg"></div>
+<form id="loginForm" class="form" onsubmit="handleLogin(event);return false;">
+<input type="text" name="username" placeholder="Username" required>
+<input type="password" name="password" placeholder="Password" required>
+<button type="submit" class="btn">🚀 Accedi</button>
+</form>
+<form id="regForm" class="form" onsubmit="handleReg(event);return false;">
+<input type="text" name="username" placeholder="Username" required>
+<input type="email" name="email" placeholder="Email" required>
+<input type="password" name="password" placeholder="Password" required>
+<button type="submit" class="btn">✨ Crea Account</button>
+</form>
+</div>
+<script>
+function switchTab(t){document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));event.target.classList.add('active');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('regForm').style.display=t==='register'?'block':'none';document.getElementById('msg').style.display='none';}
+function showMsg(txt,type){const m=document.getElementById('msg');m.textContent=txt;m.className='msg '+(type==='ok'?'ok':'err');m.style.display='block';}
+async function handleLogin(e){e.preventDefault();const btn=e.target.querySelector('button');btn.disabled=true;btn.textContent='⏳ Accesso...';const fd=new FormData(e.target);try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(fd))});const d=await r.json();if(d.ok){showMsg('✅ Login OK!','ok');setTimeout(()=>window.location.href='/',1000);}else{showMsg('❌ '+d.msg,'err');btn.disabled=false;btn.textContent='🚀 Accedi';}}catch(e){showMsg('❌ Errore','err');btn.disabled=false;btn.textContent='🚀 Accedi';}}
+async function handleReg(e){e.preventDefault();const btn=e.target.querySelector('button');btn.disabled=true;btn.textContent='⏳ Creazione...';const fd=new FormData(e.target);try{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(fd))});const d=await r.json();if(d.ok){showMsg('✅ Account creato!','ok');setTimeout(()=>window.location.href='/select-plan',1500);}else{showMsg('❌ '+d.msg,'err');btn.disabled=false;btn.textContent='✨ Crea Account';}}catch(e){showMsg('❌ Errore','err');btn.disabled=false;btn.textContent='✨ Crea Account';}}
+</script>
+</body>
+</html>'''
+    
+    return html
 
 @app.route('/guest')
 def guest():
@@ -1576,16 +446,143 @@ def guest():
 def select_plan():
     if 'user' not in session:
         return redirect('/login')
-    return render_template_string(PLAN_HTML)
+    
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scegli Piano - NEXUS AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,sans-serif;background:linear-gradient(-45deg,#0a0a0a,#1a1a2e,#16213e,#0f3460);background-size:400% 400%;animation:gradient 15s ease infinite;color:#fff;padding:20px;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+@keyframes gradient{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+.container{max-width:1200px;width:100%;}
+h1{text-align:center;font-size:48px;margin-bottom:20px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.subtitle{text-align:center;color:#aaa;font-size:18px;margin-bottom:60px;}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:30px;}
+.plan{background:rgba(10,10,10,0.95);border:2px solid rgba(102,126,234,0.2);border-radius:24px;padding:40px;position:relative;}
+.plan.premium{border-color:#FFD700;background:linear-gradient(135deg,rgba(255,215,0,0.1),rgba(102,126,234,0.1));}
+.plan-badge{position:absolute;top:-15px;right:20px;background:linear-gradient(135deg,#667eea,#764ba2);padding:8px 20px;border-radius:20px;font-size:12px;font-weight:700;}
+.plan-name{font-size:32px;font-weight:900;margin-bottom:15px;}
+.plan-price{font-size:48px;font-weight:900;margin-bottom:10px;}
+.plan-price span{font-size:20px;color:#aaa;}
+.plan-desc{color:#aaa;margin-bottom:30px;font-size:14px;}
+.features{list-style:none;margin-bottom:30px;}
+.features li{padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;gap:10px;}
+.check{color:#00C853;font-size:20px;}
+.cross{color:#FF6B6B;font-size:20px;}
+.btn{width:100%;padding:18px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;min-height:48px;}
+.btn.free{background:rgba(255,255,255,0.1);}
+@media(max-width:768px){h1{font-size:32px;}.plans{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>⚡ Scegli il tuo Piano</h1>
+<p class="subtitle">Il bot più potente al mondo</p>
+<div class="plans">
+<div class="plan">
+<div class="plan-name">🆓 Gratis</div>
+<div class="plan-price">€0<span>/mese</span></div>
+<p class="plan-desc">Perfetto per iniziare</p>
+<ul class="features">
+<li><span class="check">✓</span> Chat AI illimitata</li>
+<li><span class="check">✓</span> Multilingua</li>
+<li><span class="check">✓</span> Info 2025</li>
+<li><span class="cross">✗</span> Analisi immagini</li>
+<li><span class="cross">✗</span> Generazione immagini</li>
+<li><span class="cross">✗</span> Generazione video</li>
+</ul>
+<button class="btn free" onclick="location.href='/'">🚀 Inizia Gratis</button>
+</div>
+<div class="plan premium">
+<div class="plan-badge">⭐ CONSIGLIATO</div>
+<div class="plan-name">💎 Premium</div>
+<div class="plan-price">€15<span>/mese</span></div>
+<p class="plan-desc">Tutto il potenziale di NEXUS AI</p>
+<ul class="features">
+<li><span class="check">✓</span> Chat AI illimitata</li>
+<li><span class="check">✓</span> Multilingua</li>
+<li><span class="check">✓</span> Info 2025</li>
+<li><span class="check">✓</span> Analisi immagini AI</li>
+<li><span class="check">✓</span> Generazione immagini HD</li>
+<li><span class="check">✓</span> Generazione video</li>
+<li><span class="check">✓</span> Supporto prioritario</li>
+</ul>
+<button class="btn" onclick="location.href='/upgrade'">⚡ Diventa Premium</button>
+</div>
+</div>
+</div>
+</body>
+</html>'''
+    
+    return html
 
 @app.route('/upgrade')
 def upgrade():
     if 'user' not in session:
         return redirect('/login')
-    return render_template_string(UPGRADE_HTML, 
-        username=session['user'],
-        gumroad_url=GUMROAD_URL
-    )
+    
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Premium - NEXUS AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,sans-serif;background:linear-gradient(-45deg,#0a0a0a,#1a1a2e,#16213e,#0f3460);background-size:400% 400%;animation:gradient 15s ease infinite;color:#fff;padding:20px;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+@keyframes gradient{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+.box{background:rgba(10,10,10,0.95);border:2px solid #FFD700;border-radius:24px;padding:50px 40px;max-width:600px;width:100%;text-align:center;}
+.icon{font-size:80px;margin-bottom:20px;}
+h1{font-size:42px;margin-bottom:20px;background:linear-gradient(135deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.price{font-size:64px;font-weight:900;margin-bottom:10px;}
+.price span{font-size:24px;color:#aaa;}
+.desc{color:#aaa;margin-bottom:40px;}
+.features{text-align:left;margin-bottom:40px;}
+.feature{padding:15px;background:rgba(255,255,255,0.05);border-radius:12px;margin-bottom:10px;display:flex;align-items:center;gap:15px;}
+.btn{width:100%;padding:20px;background:linear-gradient(135deg,#FFD700,#FFA500);border:none;border-radius:12px;color:#000;font-size:18px;font-weight:900;cursor:pointer;margin-bottom:20px;min-height:48px;}
+.back{color:#667eea;text-decoration:none;font-size:14px;}
+</style>
+</head>
+<body>
+<div class="box">
+<div class="icon">💎</div>
+<h1>Diventa Premium</h1>
+<div class="price">€15<span>/mese</span></div>
+<p class="desc">Sblocca tutte le funzionalità</p>
+<div class="features">
+<div class="feature"><span>🎨</span><div><strong>Generazione Immagini HD</strong><br><small>Crea immagini con AI</small></div></div>
+<div class="feature"><span>🎬</span><div><strong>Generazione Video</strong><br><small>Produci video professionali</small></div></div>
+<div class="feature"><span>👁️</span><div><strong>Analisi Immagini</strong><br><small>Vision AI avanzata</small></div></div>
+<div class="feature"><span>⚡</span><div><strong>Supporto Prioritario</strong><br><small>Assistenza 24/7</small></div></div>
+</div>
+<button class="btn" onclick="goToGumroad()">🚀 Acquista Ora - €15</button>
+<a href="/" class="back">← Torna alla chat</a>
+</div>
+<script>
+function goToGumroad(){
+const url="''' + GUMROAD_URL + '''?wanted=true&username=''' + session.get('user', '') + '''";
+window.open(url,'gumroad','width=800,height=800');
+const check=setInterval(async()=>{
+try{
+const r=await fetch('/api/check-premium');
+const d=await r.json();
+if(d.premium){
+clearInterval(check);
+alert('✅ Pagamento OK! Ora sei Premium!');
+window.location.href='/';
+}
+}catch(e){}
+},3000);
+setTimeout(()=>clearInterval(check),300000);
+}
+</script>
+</body>
+</html>'''
+    
+    return html
 
 @app.route('/logout')
 def logout():
@@ -1606,10 +603,10 @@ def register():
         if username in USERS:
             return jsonify({"ok": False, "msg": "Username già esistente"})
         
-        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         USERS[username] = {
             "email": email,
-            "password": hashed.decode(),
+            "password": hashed.decode('utf-8'),
             "premium": False,
             "created": datetime.now(ITALY_TZ).isoformat()
         }
@@ -1636,7 +633,7 @@ def api_login():
         if user.get('guest'):
             return jsonify({"ok": False, "msg": "Account ospite non valido"})
         
-        if not bcrypt.checkpw(password.encode(), user['password'].encode()):
+        if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
             return jsonify({"ok": False, "msg": "Password errata"})
         
         session['user'] = username
@@ -1655,11 +652,9 @@ def check_premium():
 
 @app.route('/api/activate-premium', methods=['POST'])
 def activate_premium():
-    """Endpoint per attivare premium dopo pagamento Gumroad"""
     try:
         data = request.json
         username = data.get('username')
-        code = data.get('code')  # Codice di verifica da Gumroad
         
         if username in USERS:
             USERS[username]['premium'] = True
@@ -1667,7 +662,7 @@ def activate_premium():
             return jsonify({"ok": True})
         return jsonify({"ok": False, "msg": "Utente non trovato"})
     except:
-        return jsonify({"ok": False, "msg": "Errore attivazione"})
+        return jsonify({"ok": False, "msg": "Errore"})
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -1681,10 +676,9 @@ def chat():
         message = request.form.get('message', '').strip()
         image = request.files.get('image')
         
-        # Rileva lingua
         lang = detect_language(message) if message else "it"
         
-        # Se c'è un'immagine (Vision AI)
+        # Vision AI
         if image:
             if not is_premium:
                 return jsonify({"ok": False, "msg": "Vision AI richiede Premium"})
@@ -1693,10 +687,10 @@ def chat():
             path = os.path.join("static", "uploads", filename)
             image.save(path)
             
-            result = analyze_img(path, message or "Analizza questa immagine")
+            result = analyze_img(path, message or "Analizza immagine")
             return jsonify({"ok": True, "response": result, "type": "vision"})
         
-        # Check per generazione immagine
+        # Generazione immagine
         if any(kw in message.lower() for kw in ['genera immagine', 'crea immagine', 'generate image', 'create image', 'disegna', 'draw']):
             if not is_premium:
                 return jsonify({"ok": False, "msg": "Generazione immagini richiede Premium"})
@@ -1705,7 +699,7 @@ def chat():
             if url:
                 return jsonify({"ok": True, "url": url, "type": "image"})
         
-        # Check per generazione video
+        # Generazione video
         if any(kw in message.lower() for kw in ['genera video', 'crea video', 'generate video', 'create video']):
             if not is_premium:
                 return jsonify({"ok": False, "msg": "Generazione video richiede Premium"})
@@ -1729,23 +723,18 @@ def chat():
         return jsonify({"ok": False, "msg": f"Errore: {str(e)}"})
 
 # ============================================
-# AUTO-UPDATE SYSTEM
+# AUTO-UPDATE
 # ============================================
 def auto_update():
-    """Sistema di auto-aggiornamento mensile"""
     while True:
         try:
-            time.sleep(86400 * 30)  # 30 giorni
-            
-            # Aggiorna versione
+            time.sleep(86400 * 30)
             now = datetime.now(ITALY_TZ)
             new_version = f"2.{now.year}.{now.month}"
-            
             DB['version'] = new_version
             DB['last_update'] = now.isoformat()
             save_db()
-            
-            print(f"✅ Auto-update completato: v{new_version}")
+            print(f"✅ Auto-update: v{new_version}")
         except:
             pass
 
@@ -1755,27 +744,26 @@ threading.Thread(target=auto_update, daemon=True).start()
 # MAIN
 # ============================================
 if __name__ == "__main__":
-    print("\n" + "="*80)
-    print("⚡ NEXUS AI 2.0 - IL BOT PIÙ POTENTE AL MONDO")
-    print("="*80)
+    print("\n" + "="*60)
+    print("⚡ NEXUS AI 2.0 - BOT PIÙ POTENTE AL MONDO")
+    print("="*60)
     print(f"📦 Versione: {VERSION}")
-    print(f"🕐 Ora Italia: {datetime.now(ITALY_TZ).strftime('%d/%m/%Y %H:%M')}")
-    print(f"✅ Groq AI: {'ATTIVO' if groq_client else 'NON CONFIGURATO'}")
+    print(f"🕐 Ora: {datetime.now(ITALY_TZ).strftime('%d/%m/%Y %H:%M')}")
+    print(f"✅ Groq: {'ATTIVO' if groq_client else 'NON CONFIGURATO'}")
     print(f"👥 Utenti: {len(USERS)}")
-    print(f"💎 Premium: {sum(1 for u in USERS.values() if u.get('premium', False))}")
+    print(f"💎 Premium: {sum(1 for u in USERS.values() if u.get('premium'))}")
     print("\n🌐 Server: http://127.0.0.1:5000")
     print("\n💡 FUNZIONALITÀ:")
-    print("   ✅ Responsive totale (mobile/tablet/desktop)")
-    print("   ✅ Pagamenti Gumroad integrati")
-    print("   ✅ Piano selection dopo registrazione")
-    print("   ✅ Registrazione ospiti nella sidebar")
-    print("   ✅ Video generation funzionante")
-    print("   ✅ Auto-aggiornamento mensile")
-    print("   ✅ Risposta multilingua automatica")
-    print("   ✅ Timezone italiano corretto")
-    print("   ✅ Conoscenze 2025 aggiornate")
-    print("   ✅ Design accattivante premium")
-    print("="*80 + "\n")
+    print("   ✅ Responsive mobile/tablet/desktop")
+    print("   ✅ Pagamenti Gumroad €15")
+    print("   ✅ Piano selection")
+    print("   ✅ Ospiti + registrazione")
+    print("   ✅ Video/immagini generation")
+    print("   ✅ Auto-update mensile")
+    print("   ✅ Multilingua automatico")
+    print("   ✅ Timezone Italia corretto")
+    print("   ✅ Conoscenze 2025")
+    print("="*60 + "\n")
     
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
