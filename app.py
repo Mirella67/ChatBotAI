@@ -1297,83 +1297,6 @@ def chat():
         message = request.form.get('message', '').strip()
         image = request.files.get('image')
         
-        # Analisi immagine (solo Premium)
-        if image:
-            if not is_premium:
-                return jsonify({"ok": False, "msg": "⭐ L'analisi immagini richiede Premium!"})
-            
-            filename = f"{secrets.token_urlsafe(16)}.jpg"
-            filepath = os.path.join("static/uploads", filename)
-            image.save(filepath)
-            
-            result = analyze_img(filepath, message or "Analizza questa immagine")
-            return jsonify({"ok": True, "response": result, "type": "text"})
-        
-        if not message:
-            return jsonify({"ok": False, "msg": "Nessun messaggio"})
-        
-        # Rileva lingua automaticamente
-        detected_lang = detect_language(message)
-        
-        # Genera immagine
-        if any(w in message.lower() for w in ['genera immagine', 'crea immagine', 'disegna', 'generate image', 'create image', 'draw']):
-            if not is_premium:
-                return jsonify({"ok": False, "msg": "⭐ La generazione immagini richiede Premium!"})
-            
-            prompt = message.replace('genera immagine', '').replace('crea immagine', '').replace('disegna', '').strip()
-            url = gen_image(prompt)
-            
-            if url:
-                return jsonify({"ok": True, "url": url, "type": "image"})
-            else:
-                return jsonify({"ok": False, "msg": "❌ Errore generazione immagine"})
-        
-        # Genera video
-        if any(w in message.lower() for w in ['genera video', 'crea video', 'generate video', 'create video']):
-            if not is_premium:
-                return jsonify({"ok": False, "msg": "⭐ La generazione video richiede Premium!"})
-            
-            prompt = message.replace('genera video', '').replace('crea video', '').strip()
-            result = gen_video(prompt)
-            
-            if result.get('ok'):
-                return jsonify({"ok": True, "url": result['url'], "type": "video"})
-            else:
-                return jsonify({"ok": False, "msg": "❌ Errore generazione video"})
-        
-        # Chat AI normale
-        system_prompt = get_system_prompt(detected_lang)
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ]
-        
-        response = call_groq(messages)
-        
-        STATS['total_chats'] += 1
-        save_db()
-        
-        return jsonify({"ok": True, "response": response, "type": "text"})
-        
-    except Exception as e:
-        print(f"❌ Errore chat: {e}")
-        return jsonify({"ok": False, "msg": f"Errore: {str(e)}"})
-
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    """Endpoint chat principale"""
-    if 'user' not in session:
-        return jsonify({"ok": False, "msg": "Non autenticato"})
-    
-    try:
-        user_id = session['user']
-        user = USERS.get(user_id, {})
-        is_premium = user.get('premium', False)
-        
-        message = request.form.get('message', '').strip()
-        image = request.files.get('image')
-        
         if image:
             if not is_premium:
                 return jsonify({"ok": False, "msg": "⭐ L'analisi immagini richiede Premium!"})
@@ -1510,3 +1433,4 @@ if __name__ == '__main__':
     print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+
