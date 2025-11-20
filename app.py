@@ -882,83 +882,159 @@ cursor:pointer;min-height:48px;box-shadow:0 4px 15px rgba(102,126,234,0.3);
 </form>
 </div>
 <script>
-function switchTab(type){
-document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-event.target.classList.add('active');
-document.getElementById('loginForm').classList.toggle('active',type==='login');
-document.getElementById('regForm').classList.toggle('active',type==='register');
+let currentFile=null;
+const premium={{ 'true' if is_premium else 'false' }};
+const isGuest={{ 'true' if is_guest else 'false' }};
+
+function toggleSidebar(){
+const sidebar=document.getElementById('sidebar');
+sidebar.classList.toggle('show');
 }
 
-function showMsg(txt,type){
-const msg=document.getElementById('msg');
-msg.textContent=txt;
-msg.className='msg '+(type==='ok'?'ok':'err');
-msg.style.display='block';
+function newChat(){
+document.getElementById('chat').innerHTML=`
+<div class="message ai">
+👋 <strong>Nuova chat iniziata!</strong><br><br>
+Come posso aiutarti? Sono esperto in:<br>
+💰 Investimenti (azioni, crypto, forex)<br>
+💻 Programmazione e tech<br>
+🎨 Creatività e design<br>
+📊 Business e marketing<br><br>
+<strong>Chiedimi qualsiasi cosa!</strong> 😊
+</div>`;
+if(window.innerWidth<=768){
+document.getElementById('sidebar').classList.remove('show');
+}
+document.getElementById('input').focus();
 }
 
-async function handleLogin(e){
+function showFeature(type){
+if(!premium&&type!=='chat'){
+if(confirm('⭐ Questa funzione richiede Premium.\\n\\nVuoi fare l\\'upgrade ora?')){
+location.href='/upgrade';
+}
+return;
+}
+const messages={
+'image':'🎨 <strong>Genera Immagine HD</strong><br><br>Descrivi cosa vuoi che crei!<br><br>Es: "Un tramonto sul mare con una barca a vela"',
+'video':'🎬 <strong>Genera Video</strong><br><br>Descrivi la scena che vuoi vedere!<br><br>Es: "Una foresta con nebbia che si muove"',
+'vision':'👁️ <strong>Analizza Immagine</strong><br><br>Carica un\\'immagine e ti dirò tutto!'
+};
+addMessage('ai',messages[type]);
+if(window.innerWidth<=768){
+document.getElementById('sidebar').classList.remove('show');
+}
+document.getElementById('input').focus();
+}
+
+function handleKey(e){
+if(e.key==='Enter'&&!e.shiftKey){
 e.preventDefault();
-const btn=e.target.querySelector('button');
-btn.disabled=true;
-btn.textContent='⏳ Accesso...';
+sendMessage();
+}
+}
 
-const formData=new FormData(e.target);
-const data=Object.fromEntries(formData);
+function autoResize(textarea){
+textarea.style.height='auto';
+textarea.style.height=Math.min(textarea.scrollHeight,150)+'px';
+}
+
+function handleFile(){
+const fileInput=document.getElementById('fileInput');
+const file=fileInput.files[0];
+if(file){
+if(!premium){
+alert('⭐ L\\'analisi immagini richiede Premium!');
+fileInput.value='';
+return;
+}
+if(file.size>10*1024*1024){
+alert('❌ Immagine troppo grande! Max 10MB');
+fileInput.value='';
+return;
+}
+currentFile=file;
+addMessage('user','📎 <strong>Immagine caricata:</strong> '+file.name+'<br><small>Ora scrivi cosa vuoi sapere</small>');
+}
+}
+
+function addMessage(type,content){
+const chat=document.getElementById('chat');
+const msg=document.createElement('div');
+msg.className='message '+type;
+msg.innerHTML=content;
+chat.appendChild(msg);
+chat.scrollTop=chat.scrollHeight;
+}
+
+async function sendMessage(){
+console.log('sendMessage chiamata');
+const input=document.getElementById('input');
+const text=input.value.trim();
+if(!text&&!currentFile){
+console.log('Nessun testo o file');
+return;
+}
+
+const sendBtn=document.getElementById('sendBtn');
+sendBtn.disabled=true;
+
+if(text){
+addMessage('user',text);
+input.value='';
+input.style.height='auto';
+}
+
+document.getElementById('typing').classList.add('active');
 
 try{
-const response=await fetch('/api/login',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify(data)
-});
-const result=await response.json();
+const formData=new FormData();
+formData.append('message',text);
+if(currentFile){
+formData.append('image',currentFile);
+currentFile=null;
+document.getElementById('fileInput').value='';
+}
 
-if(result.ok){
-showMsg('✅ Login effettuato!','ok');
-setTimeout(()=>window.location.href='/',1000);
+console.log('Invio richiesta a /api/chat');
+const response=await fetch('/api/chat',{method:'POST',body:formData});
+console.log('Risposta ricevuta:',response.status);
+const data=await response.json();
+console.log('Dati:',data);
+
+document.getElementById('typing').classList.remove('active');
+
+if(data.ok){
+if(data.type==='video'&&data.url){
+addMessage('ai','<strong>🎬 Video Generato!</strong><br><br><div class="video-container"><img src="'+data.url+'" alt="Video generato" loading="lazy"></div>');
+}else if(data.type==='image'&&data.url){
+addMessage('ai','<strong>🎨 Immagine Creata!</strong><br><br><img src="'+data.url+'" alt="Immagine generata" loading="lazy">');
 }else{
-showMsg('❌ '+result.msg,'err');
-btn.disabled=false;
-btn.textContent='🚀 Accedi';
+const formatted=data.response.replace(/\n/g,'<br>');
+addMessage('ai',formatted);
+}
+}else{
+addMessage('ai','❌ <strong>Errore:</strong> '+(data.msg||'Qualcosa è andato storto'));
 }
 }catch(error){
-showMsg('❌ Errore di connessione','err');
-btn.disabled=false;
-btn.textContent='🚀 Accedi';
+console.error('Errore catch:',error);
+document.getElementById('typing').classList.remove('active');
+addMessage('ai','❌ <strong>Errore di connessione.</strong> Riprova!');
+}
+
+sendBtn.disabled=false;
+input.focus();
+}
+
+function logout(){
+if(confirm('🚪 Vuoi davvero uscire?')){
+location.href='/logout';
 }
 }
 
-async function handleReg(e){
-e.preventDefault();
-const btn=e.target.querySelector('button');
-btn.disabled=true;
-btn.textContent='⏳ Creazione...';
-
-const formData=new FormData(e.target);
-const data=Object.fromEntries(formData);
-
-try{
-const response=await fetch('/api/register',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify(data)
-});
-const result=await response.json();
-
-if(result.ok){
-showMsg('✅ Account creato!','ok');
-setTimeout(()=>window.location.href='/select-plan',1500);
-}else{
-showMsg('❌ '+result.msg,'err');
-btn.disabled=false;
-btn.textContent='✨ Crea Account';
-}
-}catch(error){
-showMsg('❌ Errore di connessione','err');
-btn.disabled=false;
-btn.textContent='✨ Crea Account';
-}
-}
+// Inizializzazione
+document.getElementById('input').focus();
+console.log('Script caricato, premium:',premium);
 </script>
 </body>
 </html>''')
@@ -1433,4 +1509,5 @@ if __name__ == '__main__':
     print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+
 
