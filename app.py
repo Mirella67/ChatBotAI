@@ -1360,9 +1360,81 @@ def chat():
         print(f"❌ Errore chat: {e}")
         return jsonify({"ok": False, "msg": f"Errore: {str(e)}"})
 
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Endpoint chat principale"""
+    if 'user' not in session:
+        return jsonify({"ok": False, "msg": "Non autenticato"})
+    
+    try:
+        user_id = session['user']
+        user = USERS.get(user_id, {})
+        is_premium = user.get('premium', False)
+        
+        message = request.form.get('message', '').strip()
+        image = request.files.get('image')
+        
+        if image:
+            if not is_premium:
+                return jsonify({"ok": False, "msg": "⭐ L'analisi immagini richiede Premium!"})
+            
+            filename = f"{secrets.token_urlsafe(16)}.jpg"
+            filepath = os.path.join("static/uploads", filename)
+            image.save(filepath)
+            
+            result = analyze_img(filepath, message or "Analizza questa immagine")
+            return jsonify({"ok": True, "response": result, "type": "text"})
+        
+        if not message:
+            return jsonify({"ok": False, "msg": "Nessun messaggio"})
+        
+        detected_lang = detect_language(message)
+        
+        if any(w in message.lower() for w in ['genera immagine', 'crea immagine', 'disegna', 'generate image', 'create image', 'draw']):
+            if not is_premium:
+                return jsonify({"ok": False, "msg": "⭐ La generazione immagini richiede Premium!"})
+            
+            prompt = message.replace('genera immagine', '').replace('crea immagine', '').replace('disegna', '').strip()
+            url = gen_image(prompt)
+            
+            if url:
+                return jsonify({"ok": True, "url": url, "type": "image"})
+            else:
+                return jsonify({"ok": False, "msg": "❌ Errore generazione immagine"})
+        
+        if any(w in message.lower() for w in ['genera video', 'crea video', 'generate video', 'create video']):
+            if not is_premium:
+                return jsonify({"ok": False, "msg": "⭐ La generazione video richiede Premium!"})
+            
+            prompt = message.replace('genera video', '').replace('crea video', '').strip()
+            result = gen_video(prompt)
+            
+            if result.get('ok'):
+                return jsonify({"ok": True, "url": result['url'], "type": "video"})
+            else:
+                return jsonify({"ok": False, "msg": "❌ Errore generazione video"})
+        
+        system_prompt = get_system_prompt(detected_lang)
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ]
+        
+        response = call_groq(messages)
+        
+        STATS['total_chats'] += 1
+        save_db()
+        
+        return jsonify({"ok": True, "response": response, "type": "text"})
+        
+    except Exception as e:
+        print(f"❌ Errore chat: {e}")
+        return jsonify({"ok": False, "msg": f"Errore: {str(e)}"})
+
 @app.route('/api/check-premium', methods=['GET'])
 def check_premium():
-    """Verifica stato Premium (per webhook Gumroad)"""
+    """Verifica stato Premium"""
     if 'user' not in session:
         return jsonify({"ok": False, "premium": False})
     
@@ -1380,24 +1452,14 @@ def gumroad_webhook():
     """Webhook Gumroad per attivazione Premium"""
     try:
         data = request.form.to_dict()
-        
-        # Verifica webhook (opzionale, per sicurezza)
-        # secret = request.headers.get('X-Gumroad-Secret')
-        # if secret != GUMROAD_WEBHOOK_SECRET:
-        #     return jsonify({"ok": False, "msg": "Invalid secret"}), 401
-        
-        # Estrai dati
-        sale_type = data.get('sale_type')  # 'sale' o 'subscription'
         email = data.get('email', '').strip().lower()
-        username = data.get('username', '').strip()  # Custom field dal link
-        product_id = data.get('product_id')
+        username = data.get('username', '').strip()
         
-        print(f"📥 Webhook Gumroad: {sale_type} - {email} - {username}")
+        print(f"📥 Webhook Gumroad: {email} - {username}")
         
         if not email and not username:
             return jsonify({"ok": False, "msg": "No user identifier"}), 400
         
-        # Trova utente per email o username
         user_found = None
         if username and username in USERS:
             user_found = username
@@ -1408,15 +1470,13 @@ def gumroad_webhook():
                     break
         
         if not user_found:
-            print(f"⚠️ Utente non trovato: {email} / {username}")
             return jsonify({"ok": False, "msg": "User not found"}), 404
         
-        # Attiva Premium
         USERS[user_found]['premium'] = True
         USERS[user_found]['premium_activated'] = get_italy_time().isoformat()
         save_db()
         
-        print(f"✅ Premium attivato per: {user_found}")
+        print(f"✅ Premium attivato: {user_found}")
         
         return jsonify({"ok": True, "msg": "Premium activated"})
         
@@ -1426,7 +1486,7 @@ def gumroad_webhook():
 
 @app.route('/admin/stats')
 def admin_stats():
-    """Statistiche admin (opzionale)"""
+    """Statistiche admin"""
     return jsonify({
         "version": VERSION,
         "total_users": len(USERS),
@@ -1436,10 +1496,6 @@ def admin_stats():
         "last_update": DB.get('last_update')
     })
 
-# ============================================
-# AVVIO SERVER
-# ============================================
-
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("⚡ NEXUS AI - IL BOT PIÙ POTENTE DELL'UNIVERSO")
@@ -1448,18 +1504,9 @@ if __name__ == '__main__':
     print(f"🕐 Ora Italia: {get_italy_time().strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"👥 Utenti: {len(USERS)}")
     print(f"💎 Premium: {sum(1 for u in USERS.values() if u.get('premium'))}")
-    print(f"📊 Chat totali: {STATS.get('total_chats', 0)}")
-    print(f"🎨 Immagini: {STATS.get('total_images', 0)}")
-    print(f"🎬 Video: {STATS.get('total_videos', 0)}")
     print(f"✅ Groq AI: {'Connesso' if groq_client else 'Non disponibile'}")
-    print(f"💚 Keep-Alive: Attivo")
     print("="*60)
-    print("🚀 SERVER AVVIATO SU http://127.0.0.1:5000")
+    print("🚀 SERVER: http://127.0.0.1:5000")
     print("="*60 + "\n")
     
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=False,
-        threaded=True
-    )
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
