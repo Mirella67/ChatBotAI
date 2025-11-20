@@ -645,34 +645,23 @@ const premium={% if is_premium %}true{% else %}false{% endif %};
 const isGuest={% if is_guest %}true{% else %}false{% endif %};
 
 function toggleSidebar(){
-const sidebar=document.getElementById('sidebar');
-sidebar.classList.toggle('show');
+document.getElementById('sidebar').classList.toggle('show');
 }
 
 function newChat(){
-document.getElementById('chat').innerHTML='<div class="message ai">👋 <strong>Nuova chat iniziata!</strong><br><br>Come posso aiutarti? Sono esperto in:<br>💰 Investimenti (azioni, crypto, forex)<br>💻 Programmazione e tech<br>🎨 Creatività e design<br>📊 Business e marketing<br><br><strong>Chiedimi qualsiasi cosa!</strong> 😊</div>';
-if(window.innerWidth<=768){
-document.getElementById('sidebar').classList.remove('show');
-}
+document.getElementById('chat').innerHTML='<div class="message ai">👋 <strong>Nuova chat!</strong><br><br>💰 Investimenti<br>💻 Programmazione<br>🎨 Creatività<br>📊 Business<br><br><strong>Chiedimi qualsiasi cosa!</strong> 😊</div>';
+if(window.innerWidth<=768)document.getElementById('sidebar').classList.remove('show');
 document.getElementById('input').focus();
 }
 
 function showFeature(type){
 if(!premium&&type!=='chat'){
-if(confirm('⭐ Questa funzione richiede Premium.\\n\\nVuoi fare l\\'upgrade ora?')){
-location.href='/upgrade';
-}
+if(confirm('⭐ Premium richiesto. Upgrade?'))location.href='/upgrade';
 return;
 }
-const messages={
-'image':'🎨 <strong>Genera Immagine HD</strong><br><br>Descrivi cosa vuoi che crei!<br><br>Es: "Un tramonto sul mare con una barca a vela"',
-'video':'🎬 <strong>Genera Video</strong><br><br>Descrivi la scena che vuoi vedere!<br><br>Es: "Una foresta con nebbia che si muove"',
-'vision':'👁️ <strong>Analizza Immagine</strong><br><br>Carica un\\'immagine e ti dirò tutto!'
-};
-addMessage('ai',messages[type]);
-if(window.innerWidth<=768){
-document.getElementById('sidebar').classList.remove('show');
-}
+const msgs={'image':'🎨 Descrivi l\\'immagine!','video':'🎬 Descrivi il video!','vision':'👁️ Carica un\\'immagine!'};
+addMessage('ai',msgs[type]);
+if(window.innerWidth<=768)document.getElementById('sidebar').classList.remove('show');
 document.getElementById('input').focus();
 }
 
@@ -683,28 +672,19 @@ sendMessage();
 }
 }
 
-function autoResize(textarea){
-textarea.style.height='auto';
-textarea.style.height=Math.min(textarea.scrollHeight,150)+'px';
+function autoResize(t){
+t.style.height='auto';
+t.style.height=Math.min(t.scrollHeight,150)+'px';
 }
 
 function handleFile(){
-const fileInput=document.getElementById('fileInput');
-const file=fileInput.files[0];
-if(file){
-if(!premium){
-alert('⭐ L\\'analisi immagini richiede Premium!');
-fileInput.value='';
-return;
-}
-if(file.size>10*1024*1024){
-alert('❌ Immagine troppo grande! Max 10MB');
-fileInput.value='';
-return;
-}
+const f=document.getElementById('fileInput');
+const file=f.files[0];
+if(!file)return;
+if(!premium){alert('⭐ Premium richiesto!');f.value='';return;}
+if(file.size>10485760){alert('❌ Max 10MB');f.value='';return;}
 currentFile=file;
-addMessage('user','📎 <strong>Immagine caricata:</strong> '+file.name+'<br><small>Ora scrivi cosa vuoi sapere</small>');
-}
+addMessage('user','📎 '+file.name+' caricato');
 }
 
 function addMessage(type,content){
@@ -717,16 +697,13 @@ chat.scrollTop=chat.scrollHeight;
 }
 
 async function sendMessage(){
-console.log('sendMessage chiamata');
 const input=document.getElementById('input');
 const text=input.value.trim();
-if(!text&&!currentFile){
-console.log('Nessun testo');
-return;
-}
+console.log('sendMessage called, text:',text);
+if(!text&&!currentFile){console.log('empty');return;}
 
-const sendBtn=document.getElementById('sendBtn');
-sendBtn.disabled=true;
+const btn=document.getElementById('sendBtn');
+btn.disabled=true;
 
 if(text){
 addMessage('user',text);
@@ -737,52 +714,43 @@ input.style.height='auto';
 document.getElementById('typing').classList.add('active');
 
 try{
-const formData=new FormData();
-formData.append('message',text);
-if(currentFile){
-formData.append('image',currentFile);
-currentFile=null;
-document.getElementById('fileInput').value='';
-}
+const fd=new FormData();
+fd.append('message',text);
+if(currentFile){fd.append('image',currentFile);currentFile=null;document.getElementById('fileInput').value='';}
 
-console.log('Invio richiesta...');
-const response=await fetch('/api/chat',{method:'POST',body:formData});
-console.log('Risposta:',response.status);
-const data=await response.json();
-console.log('Dati:',data);
+console.log('Fetching /api/chat...');
+const res=await fetch('/api/chat',{method:'POST',body:fd});
+console.log('Response status:',res.status);
+const data=await res.json();
+console.log('Data:',data);
 
 document.getElementById('typing').classList.remove('active');
 
 if(data.ok){
-if(data.type==='video'&&data.url){
-addMessage('ai','<strong>🎬 Video Generato!</strong><br><br><div class="video-container"><img src="'+data.url+'" alt="Video" loading="lazy"></div>');
-}else if(data.type==='image'&&data.url){
-addMessage('ai','<strong>🎨 Immagine Creata!</strong><br><br><img src="'+data.url+'" alt="Immagine" loading="lazy">');
+if(data.type==='video'&&data.url)addMessage('ai','<strong>🎬 Video!</strong><br><br><div class="video-container"><img src="'+data.url+'"></div>');
+else if(data.type==='image'&&data.url)addMessage('ai','<strong>🎨 Immagine!</strong><br><br><img src="'+data.url+'">');
+else addMessage('ai',data.response.replace(/\n/g,'<br>'));
 }else{
-const formatted=data.response.replace(/\n/g,'<br>');
-addMessage('ai',formatted);
+addMessage('ai','❌ '+(data.msg||'Errore'));
 }
-}else{
-addMessage('ai','❌ <strong>Errore:</strong> '+(data.msg||'Errore'));
-}
-}catch(error){
-console.error('Errore:',error);
+}catch(err){
+console.error('Error:',err);
 document.getElementById('typing').classList.remove('active');
-addMessage('ai','❌ <strong>Errore di connessione.</strong> Riprova!');
+addMessage('ai','❌ Errore connessione');
 }
 
-sendBtn.disabled=false;
+btn.disabled=false;
 input.focus();
 }
 
 function logout(){
-if(confirm('🚪 Vuoi davvero uscire?')){
-location.href='/logout';
-}
+if(confirm('🚪 Uscire?'))location.href='/logout';
 }
 
+document.addEventListener('DOMContentLoaded',function(){
 document.getElementById('input').focus();
-console.log('Script caricato');
+console.log('Loaded. Premium:',premium,'Guest:',isGuest);
+});
 </script>
 </body>
 </html>''', session=session, is_premium=is_premium, is_guest=is_guest)
@@ -1433,3 +1401,4 @@ if __name__ == '__main__':
         debug=False,
         threaded=True
     )
+
